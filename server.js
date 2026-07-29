@@ -276,3 +276,4 @@ app.get('/api/movie/:slug', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Huy Cinema Server đang chạy tại: http://localhost:${PORT}`);
 });
+
