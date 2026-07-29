@@ -97,8 +97,8 @@
         <div class="container mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3">
             
             <div class="flex items-center gap-3 cursor-pointer select-none group" onclick="goHome()">
-                <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-red-700 via-red-600 to-rose-500 flex items-center justify-center font-black text-xl text-white shadow-[0_0_15px_rgba(229,9,20,0.7)] group-hover:scale-105 transition border border-white/30">
-                    H
+                <div class="w-9 h-9 rounded-2xl overflow-hidden flex items-center justify-center shadow-[0_0_15px_rgba(229,9,20,0.7)] group-hover:scale-105 transition border border-white/30 bg-black">
+                    <img src="logo.png" alt="Logo" class="w-full h-full object-cover">
                 </div>
                 <span class="text-xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-red-500 to-rose-400 red-glow-text">
                     ʜᴜʏ ᴄɪɴᴇᴍᴀ
@@ -538,7 +538,6 @@
                 card.className = "vip-card rounded-xl overflow-hidden cursor-pointer group flex-shrink-0 w-28 sm:w-36 snap-start";
                 card.onclick = () => watchMovie(item.slug, item.epName);
 
-                // Tránh lặp chữ "Tập Tập" bằng cách kiểm tra
                 let epBadge = item.epName.toLowerCase().startsWith('tập') ? item.epName : `Tập ${item.epName}`;
 
                 card.innerHTML = `
