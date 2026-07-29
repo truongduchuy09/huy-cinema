@@ -7,6 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
+// Phục vụ các file tĩnh trong thư mục public
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SOURCES = {
@@ -178,6 +180,15 @@ function normalizeMovieItem(item, sourceName, baseImg) {
         source: sourceName
     };
 }
+
+// FIX CHÍNH: Trả về file index.html cho tất cả các request không phải API
+app.get('*', (req, res) => {
+    // Nếu index.html nằm trong thư mục public:
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    
+    // Lưu ý: Nếu file index.html của bạn nằm ở thư mục gốc (không nằm trong public), hãy sửa dòng trên thành:
+    // res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 app.listen(PORT, () => {
     console.log(`Server Huy Cinema đang chạy tại port ${PORT}`);
