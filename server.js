@@ -8,7 +8,15 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Hàm chuẩn hóa URL hình ảnh theo nguồn
+// Hàm chuẩn hóa chuỗi tập phim
+function normalizeEpisode(epText) {
+    if (!epText) return 'Full';
+    let clean = epText.replace(/tập\s*/gi, '').trim();
+    if (!clean || clean.toLowerCase() === 'full') return 'Full';
+    return `Tập ${clean}`;
+}
+
+// Hàm chuẩn hóa URL hình ảnh (Ophim vs PhimAPI)
 function normalizeImageUrl(url, source = 'ophim') {
     if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
@@ -19,55 +27,16 @@ function normalizeImageUrl(url, source = 'ophim') {
     return `https://img.ophim.live/uploads/movies/${url}`;
 }
 
-// Hàm chuẩn hóa thông minh: Ongoing -> Tập X/Y | Completed -> Hoàn tất
-function normalizeEpisode(item) {
-    const current = (item.episode_current || '').trim();
-    const total = (item.episode_total || '').trim();
-    
-    const lowerCurrent = current.toLowerCase();
-    const lowerTotal = total.toLowerCase();
-
-    if (
-        lowerCurrent.includes('full') ||
-        lowerCurrent.includes('hoàn tất') ||
-        lowerCurrent.includes('trọn bộ') ||
-        lowerTotal.includes('full') ||
-        lowerTotal.includes('hoàn tất')
-    ) {
-        return 'Hoàn tất';
-    }
-
-    if (current.includes('/')) {
-        const parts = current.split('/');
-        if (parts.length === 2 && parts[0].trim() === parts[1].trim() && /\d+/.test(parts[0])) {
-            return 'Hoàn tất';
-        }
-    }
-
-    let currentNum = current.replace(/\D/g, '');
-    let totalNum = total.replace(/\D/g, '');
-
-    if (currentNum && totalNum) {
-        if (currentNum === totalNum) {
-            return 'Hoàn tất';
-        }
-        return `Tập ${currentNum}/${totalNum}`;
-    } else if (currentNum) {
-        return `Tập ${currentNum}`;
-    }
-    
-    return current ? (lowerCurrent.startsWith('tập') ? current : `Tập ${current}`) : 'Hoàn tất';
-}
-
-// API: Lấy danh sách phim
+// API: Lấy danh sách phim (Trang chủ & Danh mục)
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
         const category = req.query.category || 'all';
         
-        let url = category === 'all' 
-            ? `https://ophim1.com/v1/api/home?page=${page}`
-            : `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
+        let url = `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
+        if (category === 'all') {
+            url = `https://ophim1.com/v1/api/home?page=${page}`;
+        }
 
         const response = await axios.get(url);
         const data = response.data;
@@ -77,7 +46,7 @@ app.get('/api/movies', async (req, res) => {
             ...item,
             thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
             poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
-            episode_current: normalizeEpisode(item)
+            episode_current: normalizeEpisode(item.episode_current)
         }));
 
         res.json({
@@ -91,12 +60,12 @@ app.get('/api/movies', async (req, res) => {
     }
 });
 
-// API: Tìm kiếm (Ưu tiên Ophim, nếu không có kết quả mới dùng PhimAPI)
+// API: Tìm kiếm (Ưu tiên Ophim trước, nếu không có mới dùng PhimAPI)
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
         
-        // 1. Thử tìm trên Ophim trước
+        // 1. Thử tìm bên Ophim trước
         const ophimUrl = `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
         const ophimRes = await axios.get(ophimUrl);
         let items = ophimRes.data.data?.items || [];
@@ -106,12 +75,12 @@ app.get('/api/search', async (req, res) => {
                 ...item,
                 thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
                 poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
-                episode_current: normalizeEpisode(item)
+                episode_current: normalizeEpisode(item.episode_current)
             }));
             return res.json({ status: true, items: items });
         }
 
-        // 2. Nếu Ophim không có kết quả, tìm trên PhimAPI
+        // 2. Nếu Ophim không có, tìm sang PhimAPI
         const phimapiUrl = `https://phimapi.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
         const phimapiRes = await axios.get(phimapiUrl);
         items = phimapiRes.data.items || phimapiRes.data.data?.items || [];
@@ -120,7 +89,7 @@ app.get('/api/search', async (req, res) => {
             ...item,
             thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'phimapi'),
             poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'phimapi'),
-            episode_current: normalizeEpisode(item)
+            episode_current: normalizeEpisode(item.episode_current)
         }));
 
         res.json({ status: true, items: items });
@@ -130,7 +99,7 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// API: Lấy chi tiết phim (Ưu tiên thông tin/ảnh Ophim + Gộp server từ cả 2 nguồn nếu có)
+// API: Chi tiết phim (Ưu tiên thông tin/ảnh Ophim + Gộp chung Server từ cả 2 nguồn)
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
@@ -144,7 +113,7 @@ app.get('/api/movie/:slug', async (req, res) => {
         let combinedServers = [];
         let hasOphim = false;
 
-        // 1. Kiểm tra dữ liệu từ Ophim
+        // 1. Xử lý dữ liệu từ Ophim
         if (ophimRes.status === 'fulfilled' && ophimRes.value.data.status) {
             const ophimData = ophimRes.value.data;
             movie = ophimData.data.item;
@@ -162,11 +131,10 @@ app.get('/api/movie/:slug', async (req, res) => {
             });
         }
 
-        // 2. Lấy thêm server từ PhimAPI (và dùng làm fallback nếu Ophim hoàn toàn không có)
+        // 2. Xử lý dữ liệu từ PhimAPI (Gộp server và làm fallback nếu Ophim thiếu)
         if (phimapiRes.status === 'fulfilled' && (phimapiRes.value.data.status || phimapiRes.value.data.movie)) {
             const phimapiData = phimapiRes.value.data;
             
-            // Nếu Ophim không có phim này, dùng thông tin và ảnh từ PhimAPI
             if (!hasOphim) {
                 movie = phimapiData.movie || phimapiData.data?.item;
                 if (movie) {
@@ -199,6 +167,7 @@ app.get('/api/movie/:slug', async (req, res) => {
     }
 });
 
+// Khởi động server
 app.listen(PORT, () => {
     console.log(`Huy Cinema Server đang chạy tại: http://localhost:${PORT}`);
 });
