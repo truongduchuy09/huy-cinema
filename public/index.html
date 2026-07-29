@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Huy Cinema - Multi Source & Resume Progress</title>
+    <title>Huy Cinema</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
@@ -13,39 +14,54 @@
 </head>
 <body class="bg-gray-900 text-white font-sans">
 
-    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg">
-        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+    <!-- HEADER + THANH TÌM KIẾM -->
+    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg border-b border-gray-700">
+        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-red-500 cursor-pointer select-none hover:opacity-80 transition" onclick="goHome()">Huy Cinema</h1>
             
-            <div class="flex flex-wrap justify-center gap-2">
-                <button onclick="setCategory('all')" id="cat-all" class="cat-btn bg-red-600 px-3 py-1.5 text-xs font-bold rounded-full transition">Tất Cả Phim</button>
-                <button onclick="setCategory('hoat-hinh')" id="cat-hoat-hinh" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 text-xs font-bold rounded-full transition">Anime / Hoạt Hình</button>
-                <button onclick="setCategory('phim-bo')" id="cat-phim-bo" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 text-xs font-bold rounded-full transition">Phim Bộ</button>
-                <button onclick="setCategory('phim-le')" id="cat-phim-le" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 text-xs font-bold rounded-full transition">Phim Lẻ</button>
-            </div>
+            <!-- THANH TÌM KIẾM -->
+            <form onsubmit="handleSearch(event)" class="flex w-full sm:w-auto gap-2">
+                <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500 text-sm">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded font-medium text-sm transition">Tìm</button>
+            </form>
+        </div>
+
+        <!-- DANH MỤC LỌC PHIM -->
+        <div class="container mx-auto flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide text-xs font-semibold">
+            <button onclick="filterCategory('all')" class="cat-btn bg-red-600 px-3 py-1.5 rounded-full transition">Tất Cả</button>
+            <button onclick="filterCategory('phim-bo')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Phim Bộ</button>
+            <button onclick="filterCategory('phim-le')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Phim Lẻ</button>
+            <button onclick="filterCategory('hoat-hinh')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Hoạt Hình</button>
         </div>
     </header>
 
     <main class="container mx-auto px-4 py-8">
-        <section id="playerSection" class="hidden mb-12 bg-gray-800 p-4 rounded-lg shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="playingTitle" class="text-lg md:text-xl font-bold text-yellow-400">Đang tải phim...</h2>
-                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-sm bg-gray-700 px-3 py-1 rounded">Đóng [X]</button>
-            </div>
 
+        <!-- TRÌNH PHÁT VIDEO -->
+        <section id="playerSection" class="hidden mb-10 bg-gray-800 p-4 rounded-lg shadow-xl border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="playingTitle" class="text-lg md:text-xl font-bold text-yellow-400 line-clamp-1">Đang tải phim...</h2>
+                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-xs bg-gray-700 px-3 py-1.5 rounded">Đóng [X]</button>
+            </div>
+            
             <div class="aspect-video w-full max-w-4xl mx-auto bg-black rounded overflow-hidden shadow-2xl">
                 <video id="videoPlayer" controls class="w-full h-full"></video>
             </div>
 
-            <div class="mt-6 border-t border-gray-700 pt-4">
-                <h3 class="font-semibold text-gray-300 text-sm mb-2">Chọn Nguồn Phim:</h3>
-                <div id="serverList" class="flex flex-wrap gap-2 mb-4"></div>
-
-                <h3 class="font-semibold text-gray-300 text-sm mb-2">Chọn Tập Phim:</h3>
-                <div id="episodeList" class="flex flex-wrap gap-2"></div>
+            <!-- CHỌN SERVER & TẬP -->
+            <div class="mt-6 space-y-4">
+                <div id="serverList" class="flex items-center gap-2 flex-wrap text-sm">
+                    <span class="text-gray-400 font-medium">Nguồn phát:</span>
+                    <!-- Các nút Server sẽ render tại đây -->
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-300 mb-2 text-sm">Danh sách tập:</h3>
+                    <div id="episodeList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1"></div>
+                </div>
             </div>
         </section>
 
+        <!-- LỊCH SỬ XEM (TIẾP TỤC XEM) -->
         <section id="historySection" class="hidden mb-10">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-2">Tiếp Tục Xem</h2>
@@ -54,14 +70,16 @@
             <div id="historyGrid" class="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x"></div>
         </section>
 
-        <h2 id="sectionTitle" class="text-xl font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
+        <!-- DANH SÁCH PHIM -->
+        <h2 id="sectionTitle" class="text-lg md:text-xl font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
 
-        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6"></div>
 
-        <div id="pagination" class="flex justify-center gap-4 mt-12">
-            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang trước</button>
-            <span id="pageCurrent" class="self-center font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 1</span>
-            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang sau</button>
+        <!-- PHÂN TRANG -->
+        <div id="pagination" class="flex justify-center gap-4 mt-10">
+            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 text-sm px-4 py-2 rounded disabled:opacity-30 border border-gray-700">Trang trước</button>
+            <span id="pageCurrent" class="self-center text-sm font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 50</span>
+            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 text-sm px-4 py-2 rounded disabled:opacity-30 border border-gray-700">Trang sau</button>
         </div>
     </main>
 
@@ -69,39 +87,89 @@
         let currentPage = 1;
         let currentCategory = 'all';
         let hls = null;
-        let currentMovieData = null;
-        let activeServerIndex = 0;
         let currentPlaying = null;
+        let currentServersData = [];
+        let activeServerIndex = 0;
         let saveTimeout = null;
 
         function goHome() {
-            setCategory('all');
+            document.getElementById('searchInput').value = "";
+            currentCategory = 'all';
+            updateCategoryUI();
+            closePlayer();
+            loadMovies(1);
         }
 
-        function setCategory(cat) {
+        function updateCategoryUI() {
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.replace('bg-red-600', 'bg-gray-700');
+            });
+            const activeBtn = Array.from(document.querySelectorAll('.cat-btn')).find(b => 
+                (currentCategory === 'all' && b.innerText === 'Tất Cả') ||
+                (currentCategory === 'phim-bo' && b.innerText === 'Phim Bộ') ||
+                (currentCategory === 'phim-le' && b.innerText === 'Phim Lẻ') ||
+                (currentCategory === 'hoat-hinh' && b.innerText === 'Hoạt Hình')
+            );
+            if (activeBtn) activeBtn.classList.replace('bg-gray-700', 'bg-red-600');
+        }
+
+        function filterCategory(cat) {
             currentCategory = cat;
-            document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.replace('bg-red-600', 'bg-gray-700'));
-            document.getElementById(`cat-${cat}`).classList.replace('bg-gray-700', 'bg-red-600');
+            updateCategoryUI();
             closePlayer();
             loadMovies(1);
         }
 
         async function loadMovies(page) {
             currentPage = page;
-            document.getElementById('pageCurrent').innerText = `Trang ${currentPage}`;
+            document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / 50`;
+            document.getElementById('sectionTitle').innerText = "Phim Mới Cập Nhật";
+            document.getElementById('pagination').classList.remove('hidden');
 
-            if (page === 1) renderHistory();
-            else document.getElementById('historySection').classList.add('hidden');
+            if (page === 1 && currentCategory === 'all') {
+                renderHistory();
+            } else {
+                document.getElementById('historySection').classList.add('hidden');
+            }
 
             try {
                 const res = await fetch(`/api/movies?page=${page}&category=${currentCategory}`);
                 const data = await res.json();
                 
-                renderMovies(data.items || []);
+                if (data.status && data.items) {
+                    renderMovies(data.items);
+                } else {
+                    renderMovies([]);
+                }
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 document.getElementById('prevBtn').disabled = (currentPage === 1);
+                document.getElementById('nextBtn').disabled = (currentPage >= 50);
             } catch (err) {
                 console.error("Lỗi lấy danh sách phim:", err);
+            }
+        }
+
+        async function handleSearch(e) {
+            e.preventDefault();
+            const keyword = document.getElementById('searchInput').value.trim();
+            if (!keyword) return;
+
+            document.getElementById('sectionTitle').innerText = `Kết quả tìm kiếm cho: "${keyword}"`;
+            document.getElementById('pagination').classList.add('hidden');
+            document.getElementById('historySection').classList.add('hidden');
+
+            try {
+                const res = await fetch(`/api/search?keyword=${encodeURIComponent(keyword)}`);
+                const data = await res.json();
+                
+                if (data.status && data.items) {
+                    renderMovies(data.items);
+                } else {
+                    renderMovies([]);
+                }
+            } catch (err) {
+                console.error("Lỗi tìm kiếm:", err);
             }
         }
 
@@ -110,123 +178,117 @@
             grid.innerHTML = "";
 
             if (!movies || movies.length === 0) {
-                grid.innerHTML = `<p class="col-span-full text-center text-gray-400">Không tìm thấy bộ phim nào.</p>`;
+                grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-8">Không tìm thấy bộ phim nào.</p>`;
                 return;
             }
 
             movies.forEach(movie => {
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group border border-gray-700/50";
                 card.onclick = () => watchMovie(movie.slug);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
                         <img src="${movie.thumb_url}" alt="${movie.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
-                        <span class="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold shadow-md z-10">${movie.episode_current || 'Full'}</span>
-                        <span class="absolute top-2 right-2 bg-blue-600/90 text-[10px] px-1.5 py-0.5 rounded font-bold text-white shadow-md z-10">${movie.source}</span>
+                        <span class="absolute top-2 left-2 bg-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow">${movie.episode_current || 'Full'}</span>
+                        <span class="absolute top-2 right-2 bg-gray-900/80 text-[10px] px-1.5 py-0.5 rounded font-bold text-yellow-400 shadow">${movie.source || 'VIP'}</span>
                     </div>
-                    <div class="p-3">
-                        <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-red-400 transition">${movie.name}</h3>
-                        <p class="text-xs text-gray-400 mt-1">${movie.origin_name || ''} (${movie.year || 'N/A'})</p>
+                    <div class="p-2.5">
+                        <h3 class="font-semibold text-xs line-clamp-1 group-hover:text-red-400 transition">${movie.name}</h3>
+                        <p class="text-[10px] text-gray-400 mt-1">${movie.origin_name || ''} (${movie.year || 'N/A'})</p>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        async function watchMovie(slug, autoEpName = null) {
+        async function watchMovie(slug, autoPlayEpName = null) {
             try {
                 const res = await fetch(`/api/movie/${slug}`);
                 const data = await res.json();
+                
+                if (!data.status) return alert("Không tìm thấy thông tin phim!");
 
-                if (!data.status || !data.servers || data.servers.length === 0) {
-                    return alert("Phim này hiện đang bảo trì link phát!");
-                }
-
-                currentMovieData = data;
-                activeServerIndex = 0;
+                const movie = data.movie;
+                currentServersData = data.servers || [];
 
                 const playerSection = document.getElementById('playerSection');
                 playerSection.classList.remove('hidden');
                 playerSection.scrollIntoView({ behavior: 'smooth' });
 
-                renderServerButtons(autoEpName);
+                renderServerButtons(movie, autoPlayEpName);
 
             } catch (err) {
-                console.error("Lỗi lấy chi tiết phim:", err);
+                console.error("Lỗi xem phim:", err);
             }
         }
 
-        function renderServerButtons(autoEpName = null) {
-            const serverList = document.getElementById('serverList');
-            serverList.innerHTML = "";
+        function renderServerButtons(movieData, autoPlayEpName = null) {
+            const serverContainer = document.getElementById('serverList');
+            serverContainer.innerHTML = `<span class="text-gray-400 font-medium">Nguồn phát:</span>`;
 
-            currentMovieData.servers.forEach((srv, idx) => {
+            if (currentServersData.length === 0) {
+                document.getElementById('episodeList').innerHTML = `<p class="text-gray-400 text-sm">Phim đang cập nhật...</p>`;
+                return;
+            }
+
+            currentServersData.forEach((server, index) => {
                 const btn = document.createElement('button');
-                btn.className = `${idx === activeServerIndex ? 'bg-blue-600 font-bold' : 'bg-gray-700'} hover:bg-blue-600 text-white px-3 py-1.5 text-xs rounded transition`;
-                btn.innerText = srv.server_name;
-                
+                btn.className = `px-3 py-1 text-xs rounded transition ${index === activeServerIndex ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-gray-600'}`;
+                btn.innerText = server.server_name;
                 btn.onclick = () => {
-                    const video = document.getElementById('videoPlayer');
-                    if (currentPlaying && video.duration > 0) {
-                        saveHistoryItem(currentPlaying, video.currentTime, video.duration);
-                    }
-                    
-                    const currentEp = currentPlaying?.epName || autoEpName;
-                    activeServerIndex = idx;
-                    renderServerButtons(currentEp);
+                    activeServerIndex = index;
+                    renderServerButtons(movieData, autoPlayEpName);
                 };
-                serverList.appendChild(btn);
+                serverContainer.appendChild(btn);
             });
 
-            const currentEpToPlay = currentPlaying?.epName || autoEpName;
-            renderEpisodes(currentMovieData.servers[activeServerIndex].server_data, currentEpToPlay);
+            renderEpisodes(movieData, currentServersData[activeServerIndex], autoPlayEpName);
         }
 
-        function renderEpisodes(episodes, autoEpName = null) {
+        function renderEpisodes(movieData, serverObj, autoPlayEpName = null) {
             const epContainer = document.getElementById('episodeList');
             epContainer.innerHTML = "";
 
+            const episodes = serverObj?.server_data || [];
             let targetEp = episodes[0];
 
-            episodes.forEach(ep => {
+            episodes.forEach((ep) => {
                 const btn = document.createElement('button');
-                const isTarget = autoEpName ? (ep.name === autoEpName) : false;
-
-                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700'} hover:bg-red-600 text-white px-3 py-1.5 text-xs rounded transition min-w-[45px] ep-btn`;
+                const isTarget = autoPlayEpName ? (ep.name === autoPlayEpName) : false;
+                
+                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-red-600'} text-white px-3 py-1 text-xs rounded transition min-w-[40px] ep-btn`;
                 btn.innerText = ep.name;
+                
                 btn.onclick = () => {
-                    const video = document.getElementById('videoPlayer');
-                    if (currentPlaying && video.duration > 0) {
-                        saveHistoryItem(currentPlaying, video.currentTime, video.duration);
-                    }
                     document.querySelectorAll('.ep-btn').forEach(b => b.classList.replace('bg-red-600', 'bg-gray-700'));
                     btn.classList.replace('bg-gray-700', 'bg-red-600');
-                    playVideo(ep.link_m3u8, ep.name, currentMovieData.movie);
+                    playVideo(ep.link_m3u8, ep.name, movieData);
                 };
-
+                
                 epContainer.appendChild(btn);
                 if (isTarget) targetEp = ep;
             });
 
-            playVideo(targetEp.link_m3u8, targetEp.name, currentMovieData.movie);
+            if (targetEp) playVideo(targetEp.link_m3u8, targetEp.name, movieData);
         }
 
-        function playVideo(url, epName, movie) {
+        function playVideo(url, epName, movieData) {
             const video = document.getElementById('videoPlayer');
 
             currentPlaying = {
-                slug: movie.slug,
-                name: movie.name,
-                thumb_url: movie.thumb_url || movie.poster_url,
+                slug: movieData.slug,
+                name: movieData.name,
+                origin_name: movieData.origin_name || '',
+                thumb_url: movieData.thumb_url || movieData.poster_url || '',
                 epName: epName,
                 url: url
             };
 
-            document.getElementById('playingTitle').innerText = `${movie.name} - Tập ${epName}`;
+            document.getElementById('playingTitle').innerText = `${movieData.name} - Tập ${epName}`;
 
             const history = getHistory();
-            const savedItem = history.find(h => h.slug === movie.slug && h.epName === epName);
+            const savedItem = history.find(h => h.slug === movieData.slug && h.epName === epName);
             const savedTime = savedItem ? savedItem.position : 0;
 
             if (hls) hls.destroy();
@@ -235,30 +297,39 @@
                 hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
-                video.addEventListener('loadedmetadata', () => {
+                video.addEventListener('loadedmetadata', function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 }, { once: true });
             }
         }
 
-        function getHistory() { return JSON.parse(localStorage.getItem('huy_cinema_history')) || []; }
+        function getHistory() {
+            return JSON.parse(localStorage.getItem('huy_cinema_history')) || [];
+        }
 
         function saveHistoryItem(movie, position, duration) {
             if (!movie || duration === 0) return;
-            let history = getHistory().filter(h => !(h.slug === movie.slug && h.epName === movie.epName));
+            let history = getHistory();
+            
+            history = history.filter(h => !(h.slug === movie.slug && h.epName === movie.epName));
+            
             history.unshift({
-                ...movie,
+                slug: movie.slug,
+                name: movie.name,
+                thumb_url: movie.thumb_url,
+                epName: movie.epName,
                 position: position,
                 duration: duration,
                 timeText: formatTime(position)
             });
+
             if (history.length > 15) history.pop();
             localStorage.setItem('huy_cinema_history', JSON.stringify(history));
         }
@@ -268,28 +339,32 @@
             const historyGrid = document.getElementById('historyGrid');
             const history = getHistory();
 
-            if (history.length === 0) return historySection.classList.add('hidden');
+            if (history.length === 0) {
+                historySection.classList.add('hidden');
+                return;
+            }
 
             historySection.classList.remove('hidden');
             historyGrid.innerHTML = "";
 
             history.forEach(item => {
-                const percent = (item.position / item.duration) * 100 || 0;
+                const progressPercent = (item.position / item.duration) * 100 || 0;
+
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md cursor-pointer flex-shrink-0 w-36 snap-start";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group flex-shrink-0 w-32 md:w-40 snap-start border border-gray-700/50";
                 card.onclick = () => watchMovie(item.slug, item.epName);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
-                        <img src="${item.thumb_url}" class="w-full h-full object-cover">
-                        <span class="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold">Tập ${item.epName}</span>
-                        <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-600">
-                            <div class="bg-red-500 h-full" style="width: ${percent}%"></div>
+                        <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy">
+                        <span class="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow">Tập ${item.epName}</span>
+                        <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-600 z-10">
+                            <div class="bg-red-500 h-full transition-all duration-300" style="width: ${progressPercent}%"></div>
                         </div>
                     </div>
                     <div class="p-2">
-                        <h3 class="font-semibold text-xs line-clamp-1">${item.name}</h3>
-                        <p class="text-[10px] text-gray-400 mt-0.5">Dừng ở: ${item.timeText}</p>
+                        <h3 class="font-semibold text-xs line-clamp-1 group-hover:text-red-400 transition">${item.name}</h3>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Dừng: ${item.timeText || '00:00'}</p>
                     </div>
                 `;
                 historyGrid.appendChild(card);
@@ -297,34 +372,42 @@
         }
 
         function clearHistory() {
-            localStorage.removeItem('huy_cinema_history');
-            renderHistory();
+            if (confirm("Xóa lịch sử đã xem?")) {
+                localStorage.removeItem('huy_cinema_history');
+                renderHistory();
+            }
         }
 
-        function formatTime(s) {
-            let m = Math.floor(s / 60), sec = Math.floor(s % 60);
-            return `${m < 10 ? '0' : ''}${m}:${sec < 10 ? '0' : ''}${sec}`;
+        function formatTime(secs) {
+            let m = Math.floor(secs / 60);
+            let s = Math.floor(secs % 60);
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
         function closePlayer() {
             const video = document.getElementById('videoPlayer');
-            if (currentPlaying && video.duration > 0) saveHistoryItem(currentPlaying, video.currentTime, video.duration);
+            if (currentPlaying && video.duration > 0) {
+                saveHistoryItem(currentPlaying, video.currentTime, video.duration);
+            }
             video.pause();
             if (hls) hls.destroy();
             document.getElementById('playerSection').classList.add('hidden');
-            if (currentPage === 1) renderHistory();
+            currentPlaying = null;
+            if (currentPage === 1 && currentCategory === 'all') renderHistory();
         }
 
         function changePage(step) {
-            if (currentPage + step < 1) return;
-            loadMovies(currentPage + step);
+            let targetPage = currentPage + step;
+            if (targetPage < 1 || targetPage > 50) return; 
+            loadMovies(targetPage);
         }
 
-        document.getElementById('videoPlayer').addEventListener('timeupdate', () => {
-            const v = document.getElementById('videoPlayer');
-            if (currentPlaying && v.duration > 0 && !saveTimeout) {
+        const videoEl = document.getElementById('videoPlayer');
+        videoEl.addEventListener('timeupdate', () => {
+            if (!currentPlaying || videoEl.duration === 0) return;
+            if (!saveTimeout) {
                 saveTimeout = setTimeout(() => {
-                    saveHistoryItem(currentPlaying, v.currentTime, v.duration);
+                    saveHistoryItem(currentPlaying, videoEl.currentTime, videoEl.duration);
                     saveTimeout = null;
                 }, 3000);
             }
