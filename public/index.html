@@ -185,7 +185,7 @@
         <section id="historySection" class="hidden mb-8">
             <div class="flex justify-between items-center mb-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-1.5 h-5 bg-blue-500 rounded-full"></div>
+                    <div class="w-1.5 h-5 bg-red-600 rounded-full shadow-[0_0_12px_rgba(229,9,20,0.9)]"></div>
                     <h2 class="text-sm font-extrabold tracking-wide text-gray-200">TIẾP TỤC XEM</h2>
                 </div>
                 <button onclick="clearHistory()" class="text-[11px] text-gray-400 hover:text-red-400 font-semibold">[Xóa lịch sử]</button>
@@ -340,12 +340,10 @@
                 card.className = "vip-card rounded-2xl overflow-hidden cursor-pointer group flex flex-col justify-between relative";
                 card.onclick = () => watchMovie(item.slug);
 
-                // Chuẩn hóa chuỗi tập phim để không bị lặp chữ "Tập"
+                // Chuẩn hóa triệt để chuỗi tập phim bằng Regex để chống lặp chữ "Tập"
                 let epText = item.episode_current || 'Full';
-                let displayEp = epText;
-                if (epText.toLowerCase() !== 'full' && !epText.toLowerCase().startsWith('tập')) {
-                    displayEp = `Tập ${epText}`;
-                }
+                let cleanEp = epText.replace(/tập\s*/gi, '').trim();
+                let displayEp = (cleanEp.toLowerCase() === 'full' || cleanEp === '') ? 'Full' : `Tập ${cleanEp}`;
 
                 card.innerHTML = `
                     <div>
@@ -353,9 +351,9 @@
                             <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/121218/ffffff?text=No+Image'">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-                            <!-- Badges chuẩn hóa chống lặp chữ -->
+                            <!-- Badges chuẩn hóa chống lặp -->
                             <div class="absolute top-1.5 left-1.5 right-1.5 flex flex-wrap gap-1 z-10">
-                                <span class="bg-black/90 text-gray-200 text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-md border border-white/10">
+                                <span class="bg-black/90 text-gray-200 text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-md border border-white/10 shadow">
                                     ${displayEp}
                                 </span>
                                 <span class="bg-red-600 text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md">
@@ -561,7 +559,7 @@
                 card.innerHTML = `
                     <div class="relative aspect-[2/3] bg-black/40">
                         <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover">
-                        <span class="absolute top-1 left-1 bg-blue-600 text-[9px] px-1.5 py-0.5 rounded font-extrabold text-white">Tập ${item.epName}</span>
+                        <span class="absolute top-1 left-1 bg-red-600 text-[9px] px-1.5 py-0.5 rounded font-extrabold text-white shadow-md">Tập ${item.epName}</span>
                     </div>
                     <div class="p-2">
                         <h3 class="font-bold text-[11px] line-clamp-1 group-hover:text-red-500">${item.name}</h3>
