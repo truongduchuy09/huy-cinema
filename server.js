@@ -16,21 +16,27 @@ function normalizeEpisode(epText) {
     return `Tập ${clean}`;
 }
 
-// Hàm chuẩn hóa URL hình ảnh chuẩn xác cho từng nguồn
+// Hàm chuẩn hóa URL hình ảnh thông minh (Chống lặp đường dẫn uploads/movies)
 function normalizeImageUrl(url, source = 'ophim') {
     if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
 
-    if (source === 'phimapi') {
-        if (url.startsWith('/')) return `https://img.phimapi.com${url}`;
-        if (url.startsWith('uploads/')) return `https://img.phimapi.com/${url}`;
-        return `https://img.phimapi.com/uploads/movies/${url}`;
+    const domain = source === 'phimapi' ? 'https://img.phimapi.com' : 'https://img.ophim.live';
+    
+    // Dọn dẹp các ký tự thừa / dấu gạch chéo đầu tiên
+    let cleanPath = url.trim();
+    if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
+
+    // Nếu path đã chứa sẵn thư mục gốc thì chỉ việc ghép domain
+    if (cleanPath.startsWith('uploads/movies/') || cleanPath.startsWith('uploads/')) {
+        return `${domain}/${cleanPath}`;
+    }
+    if (cleanPath.startsWith('movies/')) {
+        return `${domain}/uploads/${cleanPath}`;
     }
 
-    // Mặc định cho Ophim
-    if (url.startsWith('/')) return `https://img.ophim.live${url}`;
-    if (url.startsWith('uploads/')) return `https://img.ophim.live/${url}`;
-    return `https://img.ophim.live/uploads/movies/${url}`;
+    // Mặc định nối vào thư mục chuẩn
+    return `${domain}/uploads/movies/${cleanPath}`;
 }
 
 // API: Lấy danh sách phim (Trang chủ & Danh mục - Kết hợp PhimAPI + Ophim)
@@ -64,7 +70,7 @@ app.get('/api/movies', async (req, res) => {
             items.forEach(item => {
                 const slug = item.slug;
                 if (slug) {
-                    const rawImg = item.thumb_url || item.poster_url || '';
+                    const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
                     movieMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'phimapi'),
@@ -75,7 +81,7 @@ app.get('/api/movies', async (req, res) => {
             });
         }
 
-        // 2. Lấy từ Ophim sau và ghi đè (Ưu tiên ảnh đẹp và thông tin chuẩn của Ophim cho các phim trùng)
+        // 2. Lấy từ Ophim sau và ghi đè (Ưu tiên ảnh đẹp của Ophim cho các phim trùng)
         if (ophimRes.status === 'fulfilled') {
             const data = ophimRes.value.data;
             const items = data.data?.items || [];
@@ -85,7 +91,7 @@ app.get('/api/movies', async (req, res) => {
             items.forEach(item => {
                 const slug = item.slug;
                 if (slug) {
-                    const rawImg = item.thumb_url || item.poster_url || '';
+                    const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
                     movieMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'ophim'),
@@ -107,7 +113,7 @@ app.get('/api/movies', async (req, res) => {
     }
 });
 
-// API: Tìm kiếm (Kết hợp cả 2 nguồn, chuẩn hóa ảnh độc lập)
+// API: Tìm kiếm (Kết hợp cả 2 nguồn)
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
@@ -127,7 +133,7 @@ app.get('/api/search', async (req, res) => {
             items.forEach(item => {
                 const slug = item.slug;
                 if (slug) {
-                    const rawImg = item.thumb_url || item.poster_url || '';
+                    const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
                     movieMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'phimapi'),
@@ -145,7 +151,7 @@ app.get('/api/search', async (req, res) => {
             items.forEach(item => {
                 const slug = item.slug;
                 if (slug) {
-                    const rawImg = item.thumb_url || item.poster_url || '';
+                    const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
                     movieMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'ophim'),
@@ -186,7 +192,7 @@ app.get('/api/movie/:slug', async (req, res) => {
             movie = ophimData.data.item;
             if (movie) {
                 hasOphim = true;
-                const rawImg = movie.thumb_url || movie.poster_url || '';
+                const rawImg = movie.thumb_url || movie.poster_url || movie.thumb || '';
                 movie.thumb_url = normalizeImageUrl(rawImg, 'ophim');
                 movie.poster_url = normalizeImageUrl(rawImg, 'ophim');
             }
@@ -206,7 +212,7 @@ app.get('/api/movie/:slug', async (req, res) => {
             if (!hasOphim) {
                 movie = phimapiData.movie || phimapiData.data?.item;
                 if (movie) {
-                    const rawImg = movie.thumb_url || movie.poster_url || '';
+                    const rawImg = movie.thumb_url || movie.poster_url || movie.thumb || '';
                     movie.thumb_url = normalizeImageUrl(rawImg, 'phimapi');
                     movie.poster_url = normalizeImageUrl(rawImg, 'phimapi');
                 }
