@@ -5,19 +5,61 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cấu hình phục vụ file tĩnh từ thư mục public
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Hàm chuẩn hóa chuỗi tập phim ở Backend để chống lặp từ "Tập"
-function normalizeEpisode(epText) {
-    if (!epText) return 'Full';
-    let clean = epText.replace(/tập\s*/gi, '').trim();
-    if (!clean || clean.toLowerCase() === 'full') return 'Full';
-    return `Tập ${clean}`;
+// Hàm chuẩn hóa URL hình ảnh (tránh lỗi No Image)
+function normalizeImageUrl(url) {
+    if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return `https://img.ophim.live${url}`;
+    return `https://img.ophim.live/uploads/movies/${url}`;
 }
 
-// API: Lấy danh sách phim theo danh mục và phân trang
+// Hàm chuẩn hóa thông minh: Ongoing -> Tập X/Y | Completed -> Hoàn tất
+function normalizeEpisode(item) {
+    const current = (item.episode_current || '').trim();
+    const total = (item.episode_total || '').trim();
+    
+    const lowerCurrent = current.toLowerCase();
+    const lowerTotal = total.toLowerCase();
+
+    // Kiểm tra nếu đã Full hoặc Hoàn tất
+    if (
+        lowerCurrent.includes('full') ||
+        lowerCurrent.includes('hoàn tất') ||
+        lowerCurrent.includes('trọn bộ') ||
+        lowerTotal.includes('full') ||
+        lowerTotal.includes('hoàn tất')
+    ) {
+        return 'Hoàn tất';
+    }
+
+    // Kiểm tra nếu current có dạng X/X (ví dụ 26/26)
+    if (current.includes('/')) {
+        const parts = current.split('/');
+        if (parts.length === 2 && parts[0].trim() === parts[1].trim() && /\d+/.test(parts[0])) {
+            return 'Hoàn tất';
+        }
+    }
+
+    // Lọc lấy số tập hiện tại và tổng số tập
+    let currentNum = current.replace(/\D/g, '');
+    let totalNum = total.replace(/\D/g, '');
+
+    if (currentNum && totalNum) {
+        if (currentNum === totalNum) {
+            return 'Hoàn tất';
+        }
+        return `Tập ${currentNum}/${totalNum}`;
+    } else if (currentNum) {
+        return `Tập ${currentNum}`;
+    }
+    
+    return current ? (lowerCurrent.startsWith('tập') ? current : `Tập ${current}`) : 'Hoàn tất';
+}
+
+// API: Lấy danh sách phim
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
@@ -34,7 +76,9 @@ app.get('/api/movies', async (req, res) => {
         if (data && data.data && data.data.items) {
             data.data.items = data.data.items.map(item => ({
                 ...item,
-                episode_current: normalizeEpisode(item.episode_current)
+                thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url),
+                poster_url: normalizeImageUrl(item.poster_url || item.thumb_url),
+                episode_current: normalizeEpisode(item)
             }));
         }
 
@@ -61,7 +105,9 @@ app.get('/api/search', async (req, res) => {
         let items = data.data?.items || [];
         items = items.map(item => ({
             ...item,
-            episode_current: normalizeEpisode(item.episode_current)
+            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url),
+            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url),
+            episode_current: normalizeEpisode(item)
         }));
 
         res.json({
@@ -74,7 +120,7 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// API: Lấy chi tiết phim và danh sách tập / nguồn phát
+// API: Lấy chi tiết phim
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
@@ -87,9 +133,15 @@ app.get('/api/movie/:slug', async (req, res) => {
             return res.status(404).json({ status: false, message: "Không tìm thấy phim" });
         }
 
+        let movie = data.data.item;
+        if (movie) {
+            movie.thumb_url = normalizeImageUrl(movie.thumb_url || movie.poster_url);
+            movie.poster_url = normalizeImageUrl(movie.poster_url || movie.thumb_url);
+        }
+
         res.json({
             status: true,
-            movie: data.data.item,
+            movie: movie,
             servers: data.data.item.episodes || []
         });
     } catch (error) {
@@ -98,7 +150,6 @@ app.get('/api/movie/:slug', async (req, res) => {
     }
 });
 
-// Khởi động server
 app.listen(PORT, () => {
     console.log(`Huy Cinema Server đang chạy tại: http://localhost:${PORT}`);
 });
