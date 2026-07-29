@@ -18,7 +18,7 @@ const SOURCES = {
 };
 
 // ==========================================
-// 1. API LẤY DANH SÁCH PHIM (GỘP & LỌC TRÙNG)
+// 1. API LẤY DANH SÁCH PHIM (ƯU TIÊN ẢNH OPHIM)
 // ==========================================
 app.get('/api/movies', async (req, res) => {
     const page = req.query.page || 1;
@@ -43,7 +43,6 @@ app.get('/api/movies', async (req, res) => {
             nguoncUrl = `${SOURCES.NGUONC}/films/danh-sach/phim-le?page=${page}`;
         }
 
-        // Gọi đồng thời 3 API
         const [ophimRes, phimapiRes, nguoncRes] = await Promise.allSettled([
             fetch(ophimUrl).then(r => r.json()),
             fetch(phimapiUrl).then(r => r.json()),
@@ -52,31 +51,30 @@ app.get('/api/movies', async (req, res) => {
 
         let rawList = [];
 
-        // Bóc tách dữ liệu Ophim
         if (ophimRes.status === 'fulfilled' && ophimRes.value) {
             const items = ophimRes.value.items || ophimRes.value.data?.items || [];
             const baseImg = ophimRes.value.pathImage || 'https://ophimimg.com/uploads/movies/';
             items.forEach(item => rawList.push(normalizeMovieItem(item, 'Ophim', baseImg)));
         }
 
-        // Bóc tách dữ liệu PhimAPI
         if (phimapiRes.status === 'fulfilled' && phimapiRes.value) {
             const items = phimapiRes.value.items || phimapiRes.value.data?.items || [];
             items.forEach(item => rawList.push(normalizeMovieItem(item, 'PhimAPI', 'https://phimimg.com/upload/vod/')));
         }
 
-        // Bóc tách dữ liệu NguonC
         if (nguoncRes.status === 'fulfilled' && nguoncRes.value) {
             const items = nguoncRes.value.items || [];
             items.forEach(item => rawList.push(normalizeMovieItem(item, 'NguonC', '')));
         }
 
-        // Thuật toán lọc trùng lặp dựa theo Slug hoặc Tên phim
+        // Lọc trùng & Ưu tiên lấy dữ liệu / hình ảnh từ Ophim
         const uniqueMoviesMap = new Map();
         rawList.forEach(movie => {
             const key = movie.slug || movie.name.toLowerCase().trim();
             if (!uniqueMoviesMap.has(key)) {
                 uniqueMoviesMap.set(key, movie);
+            } else if (movie.source === 'Ophim') {
+                uniqueMoviesMap.set(key, movie); // Đè lên bằng bản từ Ophim
             }
         });
 
@@ -94,7 +92,7 @@ app.get('/api/movies', async (req, res) => {
 });
 
 // ==========================================
-// 2. API LẤY CHI TIẾT PHIM & TẬP (NHIỀU SERVER)
+// 2. API LẤY CHI TIẾT PHIM & TẬP
 // ==========================================
 app.get('/api/movie/:slug', async (req, res) => {
     const slug = req.params.slug;
@@ -109,31 +107,39 @@ app.get('/api/movie/:slug', async (req, res) => {
         let movieDetail = null;
         let servers = [];
 
-        // Server Ophim
+        // Ưu tiên thông tin & hình ảnh từ Ophim
         if (ophimRes.status === 'fulfilled' && ophimRes.value?.status) {
             movieDetail = ophimRes.value.movie;
+            const baseImg = ophimRes.value.pathImage || 'https://ophimimg.com/uploads/movies/';
+            if (movieDetail.thumb_url && !movieDetail.thumb_url.startsWith('http')) {
+                movieDetail.thumb_url = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${movieDetail.thumb_url.replace(/^\/+/, '')}`;
+            }
+            if (movieDetail.poster_url && !movieDetail.poster_url.startsWith('http')) {
+                movieDetail.poster_url = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${movieDetail.poster_url.replace(/^\/+/, '')}`;
+            }
+
             const eps = ophimRes.value.episodes?.[0]?.server_data || [];
             if (eps.length > 0) {
                 servers.push({
-                    server_name: "Server 1 (Ophim)",
+                    server_name: "Ophim",
                     server_data: eps.map(e => ({ name: e.name, link_m3u8: e.link_m3u8 }))
                 });
             }
         }
 
-        // Server PhimAPI
+        // PhimAPI
         if (phimapiRes.status === 'fulfilled' && phimapiRes.value?.status) {
             if (!movieDetail) movieDetail = phimapiRes.value.movie;
             const eps = phimapiRes.value.episodes?.[0]?.server_data || [];
             if (eps.length > 0) {
                 servers.push({
-                    server_name: "Server 2 (PhimAPI)",
+                    server_name: "PhimAPI",
                     server_data: eps.map(e => ({ name: e.name, link_m3u8: e.link_m3u8 }))
                 });
             }
         }
 
-        // Server NguonC
+        // NguonC
         if (nguoncRes.status === 'fulfilled' && nguoncRes.value?.status === 'success') {
             const film = nguoncRes.value.movie;
             if (!movieDetail) {
@@ -149,7 +155,7 @@ app.get('/api/movie/:slug', async (req, res) => {
             const items = nguoncRes.value.episodes?.[0]?.items || [];
             if (items.length > 0) {
                 servers.push({
-                    server_name: "Server 3 (NguonC)",
+                    server_name: "NguonC",
                     server_data: items.map(e => ({ name: e.name, link_m3u8: e.m3u8 || e.embed }))
                 });
             }
@@ -172,24 +178,19 @@ app.get('/api/movie/:slug', async (req, res) => {
 });
 
 // ==========================================
-// 3. API TÌM KIẾM PHIM (GỘP CÁC NGUỒN)
+// 3. API TÌM KIẾM PHIM
 // ==========================================
 app.get('/api/search', async (req, res) => {
     const keyword = req.query.keyword;
     if (!keyword) return res.json({ status: true, items: [] });
 
     try {
-        const [phimapiRes, ophimRes] = await Promise.allSettled([
-            fetch(`${SOURCES.PHIMAPI}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json()),
-            fetch(`${SOURCES.OPHIM}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json())
+        const [ophimRes, phimapiRes] = await Promise.allSettled([
+            fetch(`${SOURCES.OPHIM}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json()),
+            fetch(`${SOURCES.PHIMAPI}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json())
         ]);
 
         let rawList = [];
-
-        if (phimapiRes.status === 'fulfilled' && phimapiRes.value) {
-            const items = phimapiRes.value.data?.items || phimapiRes.value.items || [];
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'PhimAPI', 'https://phimimg.com/upload/vod/')));
-        }
 
         if (ophimRes.status === 'fulfilled' && ophimRes.value) {
             const items = ophimRes.value.data?.items || ophimRes.value.items || [];
@@ -197,11 +198,17 @@ app.get('/api/search', async (req, res) => {
             items.forEach(item => rawList.push(normalizeMovieItem(item, 'Ophim', baseImg)));
         }
 
-        // Lọc trùng danh sách tìm kiếm
+        if (phimapiRes.status === 'fulfilled' && phimapiRes.value) {
+            const items = phimapiRes.value.data?.items || phimapiRes.value.items || [];
+            items.forEach(item => rawList.push(normalizeMovieItem(item, 'PhimAPI', 'https://phimimg.com/upload/vod/')));
+        }
+
         const uniqueMoviesMap = new Map();
         rawList.forEach(movie => {
             const key = movie.slug || movie.name.toLowerCase().trim();
             if (!uniqueMoviesMap.has(key)) {
+                uniqueMoviesMap.set(key, movie);
+            } else if (movie.source === 'Ophim') {
                 uniqueMoviesMap.set(key, movie);
             }
         });
@@ -217,7 +224,7 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ==========================================
-// HÀM HỖ TRỢ CHUẨN HÓA DỮ LIỆU
+// HÀM CHUẨN HÓA DỮ LIỆU & TRẠNG THÁI TẬP
 // ==========================================
 function normalizeMovieItem(item, sourceName, baseImg) {
     let thumb = item.thumb_url || item.poster_url || "";
@@ -226,20 +233,47 @@ function normalizeMovieItem(item, sourceName, baseImg) {
         thumb = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${clean}`;
     }
 
+    // Xử lý logic hiển thị số tập
+    let current = item.episode_current || '';
+    let total = item.episode_total || item.total_episodes || '';
+    let status = (item.status || '').toLowerCase();
+
+    let cleanTotal = total.toString().replace(/[^0-9]/g, '');
+    let displayEpisode = '';
+
+    const isCompleted = status === 'completed' || 
+                        current.toLowerCase().includes('full') || 
+                        current.toLowerCase().includes('hoàn tất') ||
+                        (cleanTotal && current.includes(cleanTotal));
+
+    if (isCompleted) {
+        displayEpisode = cleanTotal ? `Hoàn tất (${cleanTotal} tập)` : (current || 'Hoàn tất');
+    } else {
+        if (current) {
+            if (cleanTotal && !current.includes('/')) {
+                displayEpisode = `${current}/${cleanTotal} tập`;
+            } else {
+                displayEpisode = current;
+            }
+        } else {
+            displayEpisode = 'Đang cập nhật';
+        }
+    }
+
     return {
         name: item.name,
         origin_name: item.origin_name || item.original_name || '',
         slug: item.slug,
         thumb_url: thumb,
         year: item.year || '',
-        episode_current: item.episode_current || 'Full',
+        episode_current: displayEpisode,
         lang: item.lang || 'Vietsub',
         source: sourceName
     };
 }
 
 // ==========================================
-// ROUTE TRẢ VỀ TRANG CHỦ (FIX LỖI CANNOT GET /)
+// ROUTE TRẢ VỀ TRANG CHỦ
 // ==========================================
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
