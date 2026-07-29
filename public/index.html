@@ -8,82 +8,76 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        /* Tối ưu thanh cuộn ngang cho mục lịch sử nhìn cho đẹp */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
 
-    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg">
+    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg border-b border-gray-700">
         <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-red-500 cursor-pointer select-none hover:opacity-80 transition" onclick="goHome()">Huy Cinema</h1>
             <div class="flex w-full sm:w-auto gap-2">
-                <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500">
-                <button onclick="searchMovie()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-medium transition">Tìm</button>
+                <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500 text-sm">
+                <button onclick="searchMovie()" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded font-medium text-sm transition">Tìm</button>
             </div>
         </div>
     </header>
 
     <main class="container mx-auto px-4 py-8">
         <!-- TRÌNH PHÁT VIDEO -->
-        <section id="playerSection" class="hidden mb-12 bg-gray-800 p-4 rounded-lg shadow-xl">
+        <section id="playerSection" class="hidden mb-12 bg-gray-800 p-4 rounded-lg shadow-xl border border-gray-700">
             <div class="flex justify-between items-center mb-4">
-                <h2 id="playingTitle" class="text-xl font-bold text-yellow-400">Đang tải phim...</h2>
-                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-sm bg-gray-700 px-3 py-1 rounded">Đóng [X]</button>
+                <h2 id="playingTitle" class="text-lg font-bold text-yellow-400">Đang tải phim...</h2>
+                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-xs bg-gray-700 px-3 py-1.5 rounded transition">Đóng [X]</button>
             </div>
-            <div class="aspect-video w-full max-w-4xl mx-auto bg-black rounded overflow-hidden">
+            <div class="aspect-video w-full max-w-4xl mx-auto bg-black rounded overflow-hidden shadow-2xl">
                 <video id="videoPlayer" controls class="w-full h-full"></video>
             </div>
             
-            <!-- KHU VỰC CHỌN SERVER & TẬP PHIM -->
-            <div class="mt-4 space-y-4">
+            <div class="mt-6 space-y-4 max-w-4xl mx-auto">
                 <div id="serverContainer">
-                    <h3 class="font-semibold text-gray-300 mb-2">Chọn Server / Nguồn:</h3>
+                    <h3 class="font-semibold text-gray-300 text-sm mb-2">Chọn Server:</h3>
                     <div id="serverList" class="flex flex-wrap gap-2"></div>
                 </div>
 
                 <div>
-                    <h3 class="font-semibold text-gray-300 mb-2">Chọn tập phim:</h3>
-                    <div id="episodeList" class="flex flex-wrap gap-2"></div>
+                    <h3 class="font-semibold text-gray-300 text-sm mb-2">Danh sách tập:</h3>
+                    <div id="episodeList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1"></div>
                 </div>
             </div>
         </section>
 
-        <!-- MỤC LỊCH SỬ XEM PHIM -->
+        <!-- LỊCH SỬ XEM PHIM -->
         <section id="historySection" class="hidden mb-10">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold border-l-4 border-blue-500 pl-2">Tiếp Tục Xem</h2>
+                <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-2">Tiếp Tục Xem</h2>
                 <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 transition">[Xóa lịch sử]</button>
             </div>
-            <div id="historyGrid" class="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x">
-            </div>
+            <div id="historyGrid" class="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x"></div>
         </section>
 
-        <h2 id="sectionTitle" class="text-xl font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
+        <h2 id="sectionTitle" class="text-lg font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
 
         <!-- DANH SÁCH PHIM -->
-        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-        </div>
+        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
 
         <!-- PHÂN TRANG -->
-        <div id="pagination" class="flex justify-center gap-4 mt-12">
-            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang trước</button>
-            <span id="pageCurrent" class="self-center font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 1</span>
-            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang sau</button>
+        <div id="pagination" class="flex justify-center items-center gap-4 mt-12">
+            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed transition">Trang trước</button>
+            <span id="pageCurrent" class="text-sm font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 1</span>
+            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed transition">Trang sau</button>
         </div>
     </main>
 
     <script>
         const API_BASE = "/api";
-        
         let currentPage = 1;
-        let totalPages = 50; 
+        let totalPages = 1;
         let hls = null;
-        let currentPlaying = null; 
+        let currentPlaying = null;
         let saveTimeout = null;
 
-        // Lưu ngữ cảnh dữ liệu phim hiện tại khi mở phát
         let currentMovieDetail = null;
         let currentServers = [];
 
@@ -95,32 +89,26 @@
 
         async function loadMovies(page) {
             currentPage = page;
-            document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ${totalPages}`;
+            document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ...`;
             document.getElementById('sectionTitle').innerText = "Phim Mới Cập Nhật";
             document.getElementById('pagination').classList.remove('hidden');
 
-            if (page === 1) {
-                renderHistory();
-            } else {
-                document.getElementById('historySection').classList.add('hidden');
-            }
+            if (page === 1) renderHistory();
+            else document.getElementById('historySection').classList.add('hidden');
 
             try {
                 const res = await fetch(`${API_BASE}/movies?page=${page}`);
                 const data = await res.json();
                 
-                if (data.totalPages) totalPages = data.totalPages;
-                document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ${totalPages}`;
-                
-                if (data.items && data.items.length > 0) {
-                    renderMovies(data.items);
-                } else {
-                    renderMovies([]);
-                }
+                if (data.status) {
+                    totalPages = data.totalPages || 1;
+                    document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ${totalPages}`;
+                    renderMovies(data.items || []);
 
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                document.getElementById('prevBtn').disabled = (currentPage === 1);
-                document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    document.getElementById('prevBtn').disabled = (currentPage === 1);
+                    document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
+                }
             } catch (err) {
                 console.error("Lỗi lấy danh sách phim:", err);
             }
@@ -137,9 +125,7 @@
             try {
                 const res = await fetch(`${API_BASE}/search?keyword=${encodeURIComponent(keyword)}`);
                 const data = await res.json();
-                
-                let items = data.items || [];
-                renderMovies(items);
+                renderMovies(data.items || []);
             } catch (err) {
                 console.error("Lỗi tìm kiếm:", err);
             }
@@ -150,23 +136,20 @@
             grid.innerHTML = "";
 
             if (!movies || movies.length === 0) {
-                grid.innerHTML = `<p class="col-span-full text-center text-gray-400">Không tìm thấy bộ phim nào.</p>`;
+                grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-10">Không tìm thấy bộ phim nào.</p>`;
                 return;
             }
 
             movies.forEach(movie => {
-                let finalThumb = movie.thumb_url || 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
-                let episodeStatus = movie.episode_current || "Cập nhật";
-
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group border border-gray-700/50";
                 card.onclick = () => watchMovie(movie.slug);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
-                        <img src="${finalThumb}" alt="${movie.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
-                        <span class="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold shadow-md z-10">${episodeStatus}</span>
-                        <span class="absolute top-2 right-2 bg-gray-900/80 text-xs px-2 py-1 rounded font-bold text-yellow-400 shadow-md z-10">${movie.lang || 'Vietsub'}</span>
+                        <img src="${movie.thumb_url}" alt="${movie.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
+                        <span class="absolute top-2 left-2 bg-red-600 text-[11px] px-2 py-0.5 rounded font-bold shadow-md z-10">${movie.episode_current}</span>
+                        <span class="absolute top-2 right-2 bg-gray-900/80 text-[11px] px-2 py-0.5 rounded font-bold text-yellow-400 shadow-md z-10">${movie.lang}</span>
                     </div>
                     <div class="p-3">
                         <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-red-400 transition">${movie.name}</h3>
@@ -191,11 +174,7 @@
                 playerSection.classList.remove('hidden');
                 playerSection.scrollIntoView({ behavior: 'smooth' });
 
-                document.getElementById('playingTitle').innerText = `${currentMovieDetail.name} - ${currentMovieDetail.origin_name || ''}`;
-
-                // Hiển thị danh sách Server và Tập phim
                 renderServerTabs(activeServerIdx, autoPlayEpName);
-
             } catch (err) {
                 console.error("Lỗi lấy chi tiết phim:", err);
             }
@@ -206,18 +185,16 @@
             serverListContainer.innerHTML = "";
 
             if (currentServers.length === 0) {
-                serverListContainer.innerHTML = "<p class='text-gray-400 text-sm'>Không có nguồn server nào khả dụng.</p>";
+                serverListContainer.innerHTML = "<p class='text-gray-400 text-sm'>Không tìm thấy nguồn phát khả dụng.</p>";
                 return;
             }
 
             currentServers.forEach((srv, idx) => {
                 const btn = document.createElement('button');
                 const isActive = idx === selectedServerIdx;
-                
-                btn.className = `${isActive ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-gray-600'} text-white px-3 py-1 text-sm rounded transition`;
+                btn.className = `${isActive ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-gray-600'} text-white px-3 py-1 text-xs rounded transition`;
                 btn.innerText = srv.server_name;
                 btn.onclick = () => renderServerTabs(idx, null);
-                
                 serverListContainer.appendChild(btn);
             });
 
@@ -242,8 +219,7 @@
                 const btn = document.createElement('button');
                 const isTarget = autoPlayEpName ? (ep.name === autoPlayEpName) : false;
                 
-                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700'} hover:bg-red-600 text-white px-3 py-1.5 text-sm rounded transition min-w-[50px] ep-btn`;
-                btn.setAttribute('data-epname', ep.name);
+                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700'} hover:bg-red-600 text-white px-3 py-1.5 text-xs rounded transition min-w-[45px] ep-btn`;
                 btn.innerText = ep.name;
                 
                 btn.onclick = () => {
@@ -253,10 +229,7 @@
                 };
                 
                 epListContainer.appendChild(btn);
-
-                if (isTarget) {
-                    targetEpisode = ep;
-                }
+                if (isTarget) targetEpisode = ep;
             });
 
             playVideo(targetEpisode.link_m3u8, targetEpisode.name, currentMovieDetail);
@@ -269,7 +242,7 @@
                 slug: movieData.slug,
                 name: movieData.name,
                 origin_name: movieData.origin_name,
-                thumb_url: movieData.thumb_url || movieData.poster_url || "",
+                thumb_url: movieData.thumb_url,
                 epName: epName,
                 url: url
             };
@@ -280,9 +253,7 @@
             const savedItem = history.find(h => h.slug === movieData.slug && h.epName === epName);
             const savedTime = savedItem ? savedItem.position : 0;
 
-            if (hls) {
-                hls.destroy();
-            }
+            if (hls) hls.destroy();
 
             if (Hls.isSupported()) {
                 hls = new Hls();
@@ -292,36 +263,26 @@
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 });
-            }
-            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
                 video.addEventListener('loadedmetadata', function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 }, { once: true });
-            } else {
-                alert("Trình duyệt của bạn không hỗ trợ phát định dạng video này.");
             }
         }
 
-        // --- CÁC HÀM XỬ LÝ LỊCH SỬ XEM PHIM (LOCALSTORAGE) ---
         function getHistory() {
             return JSON.parse(localStorage.getItem('huy_cinema_history')) || [];
         }
 
         function saveHistoryItem(movie, position, duration) {
-            if (!movie || duration === 0) return;
+            if (!movie || !duration) return;
             let history = getHistory();
-            
             history = history.filter(h => !(h.slug === movie.slug && h.epName === movie.epName));
             
             history.unshift({
-                slug: movie.slug,
-                name: movie.name,
-                origin_name: movie.origin_name,
-                thumb_url: movie.thumb_url,
-                epName: movie.epName,
-                url: movie.url,
+                ...movie,
                 position: position,
                 duration: duration,
                 timeText: formatTime(position),
@@ -346,25 +307,22 @@
             historyGrid.innerHTML = "";
 
             history.forEach(item => {
-                let finalThumb = item.thumb_url || 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
                 const progressPercent = (item.position / item.duration) * 100 || 0;
-
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group flex-shrink-0 w-36 md:w-44 snap-start";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group flex-shrink-0 w-36 md:w-44 snap-start border border-gray-700/50";
                 card.onclick = () => watchMovie(item.slug, item.epName);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
-                        <img src="${finalThumb}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
+                        <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
                         <span class="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow-md z-10">Tập ${item.epName}</span>
-                        
                         <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-600 z-10">
                             <div class="bg-red-500 h-full transition-all duration-300" style="width: ${progressPercent}%"></div>
                         </div>
                     </div>
                     <div class="p-2">
                         <h3 class="font-semibold text-xs line-clamp-1 group-hover:text-red-400 transition">${item.name}</h3>
-                        <p class="text-[10px] text-gray-400 mt-0.5">Dừng ở: ${item.timeText || '00:00'}</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Đã xem: ${item.timeText || '00:00'}</p>
                     </div>
                 `;
                 historyGrid.appendChild(card);
@@ -372,7 +330,7 @@
         }
 
         function clearHistory() {
-            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử đã xem không?")) {
+            if (confirm("Xóa toàn bộ lịch sử xem phim?")) {
                 localStorage.removeItem('huy_cinema_history');
                 renderHistory();
             }
@@ -398,15 +356,13 @@
 
         function changePage(step) {
             let targetPage = currentPage + step;
-            if (targetPage < 1 || targetPage > totalPages) return; 
+            if (targetPage < 1 || targetPage > totalPages) return;
             loadMovies(targetPage);
         }
 
-        // Cập nhật tiến trình thời gian xem video
         const videoEl = document.getElementById('videoPlayer');
         videoEl.addEventListener('timeupdate', () => {
             if (!currentPlaying || videoEl.duration === 0) return;
-            
             if (!saveTimeout) {
                 saveTimeout = setTimeout(() => {
                     saveHistoryItem(currentPlaying, videoEl.currentTime, videoEl.duration);
@@ -421,7 +377,6 @@
             }
         });
 
-        // Khởi động trang web
         loadMovies(1);
     </script>
 </body>
