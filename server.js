@@ -8,10 +8,13 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Hàm chuẩn hóa URL hình ảnh (tránh lỗi No Image)
-function normalizeImageUrl(url) {
+// Hàm chuẩn hóa URL hình ảnh tương ứng theo từng nguồn
+function normalizeImageUrl(url, source = 'ophim') {
     if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (source === 'phimapi') {
+        return `https://phimapi.com/${url}`;
+    }
     if (url.startsWith('/')) return `https://img.ophim.live${url}`;
     return `https://img.ophim.live/uploads/movies/${url}`;
 }
@@ -24,7 +27,6 @@ function normalizeEpisode(item) {
     const lowerCurrent = current.toLowerCase();
     const lowerTotal = total.toLowerCase();
 
-    // Kiểm tra nếu đã Full hoặc Hoàn tất
     if (
         lowerCurrent.includes('full') ||
         lowerCurrent.includes('hoàn tất') ||
@@ -35,7 +37,6 @@ function normalizeEpisode(item) {
         return 'Hoàn tất';
     }
 
-    // Kiểm tra nếu current có dạng X/X (ví dụ 26/26)
     if (current.includes('/')) {
         const parts = current.split('/');
         if (parts.length === 2 && parts[0].trim() === parts[1].trim() && /\d+/.test(parts[0])) {
@@ -43,7 +44,6 @@ function normalizeEpisode(item) {
         }
     }
 
-    // Lọc lấy số tập hiện tại và tổng số tập
     let currentNum = current.replace(/\D/g, '');
     let totalNum = total.replace(/\D/g, '');
 
@@ -59,33 +59,43 @@ function normalizeEpisode(item) {
     return current ? (lowerCurrent.startsWith('tập') ? current : `Tập ${current}`) : 'Hoàn tất';
 }
 
-// API: Lấy danh sách phim
+// API: Lấy danh sách phim (Hỗ trợ source=ophim hoặc source=phimapi)
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
         const category = req.query.category || 'all';
+        const source = req.query.source || 'ophim';
         
-        let url = `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
-        if (category === 'all') {
-            url = `https://ophim1.com/v1/api/home?page=${page}`;
+        let url = '';
+        if (source === 'phimapi') {
+            url = category === 'all' 
+                ? `https://phimapi.com/v1/api/home?page=${page}`
+                : `https://phimapi.com/v1/api/danh-sach/${category}?page=${page}`;
+        } else {
+            url = category === 'all' 
+                ? `https://ophim1.com/v1/api/home?page=${page}`
+                : `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
         }
 
         const response = await axios.get(url);
         const data = response.data;
 
-        if (data && data.data && data.data.items) {
-            data.data.items = data.data.items.map(item => ({
-                ...item,
-                thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url),
-                poster_url: normalizeImageUrl(item.poster_url || item.thumb_url),
-                episode_current: normalizeEpisode(item)
-            }));
-        }
+        let items = source === 'phimapi' ? (data.items || data.data?.items || []) : (data.data?.items || []);
+        let totalPages = source === 'phimapi' 
+            ? (data.params?.pagination?.totalPages || data.data?.params?.pagination?.totalPages || 1)
+            : (data.data?.params?.pagination?.totalPages || 1);
+
+        items = items.map(item => ({
+            ...item,
+            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, source),
+            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, source),
+            episode_current: normalizeEpisode(item)
+        }));
 
         res.json({
             status: true,
-            items: data.data.items || [],
-            totalPages: data.data.params?.pagination?.totalPages || 1
+            items: items,
+            totalPages: totalPages
         });
     } catch (error) {
         console.error("Lỗi lấy danh sách phim:", error.message);
@@ -97,16 +107,20 @@ app.get('/api/movies', async (req, res) => {
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
-        const url = `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
+        const source = req.query.source || 'ophim';
+
+        let url = source === 'phimapi'
+            ? `https://phimapi.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`
+            : `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
         
         const response = await axios.get(url);
         const data = response.data;
 
-        let items = data.data?.items || [];
+        let items = source === 'phimapi' ? (data.items || data.data?.items || []) : (data.data?.items || []);
         items = items.map(item => ({
             ...item,
-            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url),
-            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url),
+            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, source),
+            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, source),
             episode_current: normalizeEpisode(item)
         }));
 
@@ -124,25 +138,31 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
-        const url = `https://ophim1.com/v1/api/phim/${slug}`;
+        const source = req.query.source || 'ophim';
+
+        let url = source === 'phimapi'
+            ? `https://phimapi.com/phim/${slug}`
+            : `https://ophim1.com/v1/api/phim/${slug}`;
 
         const response = await axios.get(url);
         const data = response.data;
 
-        if (!data.status) {
+        if (!data.status && !data.movie) {
             return res.status(404).json({ status: false, message: "Không tìm thấy phim" });
         }
 
-        let movie = data.data.item;
+        let movie = source === 'phimapi' ? (data.movie || data.data?.item) : data.data?.item;
+        let servers = source === 'phimapi' ? (data.episodes || data.data?.episodes || []) : (data.data?.episodes || data.data?.item?.episodes || []);
+
         if (movie) {
-            movie.thumb_url = normalizeImageUrl(movie.thumb_url || movie.poster_url);
-            movie.poster_url = normalizeImageUrl(movie.poster_url || movie.thumb_url);
+            movie.thumb_url = normalizeImageUrl(movie.thumb_url || movie.poster_url, source);
+            movie.poster_url = normalizeImageUrl(movie.poster_url || movie.thumb_url, source);
         }
 
         res.json({
             status: true,
             movie: movie,
-            servers: data.data.item.episodes || []
+            servers: servers
         });
     } catch (error) {
         console.error("Lỗi chi tiết phim:", error.message);
