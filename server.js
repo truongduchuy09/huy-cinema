@@ -45,7 +45,6 @@ app.get('/api/movies', async (req, res) => {
             ? `https://ophim1.com/v1/api/home?page=${page}`
             : `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
 
-        // Sửa đúng endpoint PhimAPI cho trang chủ (phim mới cập nhật)
         const phimapiUrl = category === 'all'
             ? `https://phimapi.com/danh-sach/phim-moi-cap-nhat?page=${page}`
             : `https://phimapi.com/v1/api/danh-sach/${category}?page=${page}`;
@@ -81,7 +80,7 @@ app.get('/api/movies', async (req, res) => {
 
         const finalMoviesMap = new Map();
 
-        // 2. Đưa PhimAPI lên đầu danh sách
+        // 2. Đưa PhimAPI lên trước để có phim cập nhật nhanh
         phimapiMap.forEach((item, slug) => {
             finalMoviesMap.set(slug, item);
         });
@@ -197,7 +196,7 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// API: Chi tiết phim
+// API: Chi tiết phim (Ưu tiên ảnh Ophim, tập phim/server lấy từ PhimAPI trước vì update nhanh)
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
@@ -207,55 +206,52 @@ app.get('/api/movie/:slug', async (req, res) => {
             axios.get(`https://phimapi.com/phim/${slug}`)
         ]);
 
-        let movie = null;
+        let ophimMovie = null;
+        let phimapiMovie = null;
         let combinedServers = [];
-        let hasOphim = false;
 
         if (ophimRes.status === 'fulfilled' && ophimRes.value.data.status) {
-            const ophimData = ophimRes.value.data;
-            movie = ophimData.data.item;
-            if (movie) {
-                hasOphim = true;
-                const rawImg = movie.thumb_url || movie.poster_url || movie.thumb || '';
-                movie.thumb_url = normalizeImageUrl(rawImg, 'ophim');
-                movie.poster_url = normalizeImageUrl(rawImg, 'poster_url' in movie ? movie.poster_url : rawImg);
-            }
-            const ophimServers = ophimData.data.episodes || ophimData.data.item?.episodes || [];
-            ophimServers.forEach((srv, idx) => {
-                combinedServers.push({
-                    server_name: `Ophim - ${srv.server_name || srv.name || `Server #${idx + 1}`}`,
-                    server_data: srv.server_data || srv.items || srv
-                });
-            });
+            ophimMovie = ophimRes.value.data.data.item;
         }
 
         if (phimapiRes.status === 'fulfilled' && (phimapiRes.value.data.status || phimapiRes.value.data.movie)) {
-            const phimapiData = phimapiRes.value.data;
-            
-            if (!hasOphim) {
-                movie = phimapiData.movie || phimapiData.data?.item;
-                if (movie) {
-                    const rawImg = movie.thumb_url || movie.poster_url || movie.thumb || '';
-                    movie.thumb_url = normalizeImageUrl(rawImg, 'phimapi');
-                    movie.poster_url = normalizeImageUrl(rawImg, 'phimapi');
-                }
-            } else if (movie && (!movie.thumb_url || movie.thumb_url.includes('No+Image'))) {
-                const phimapiMovie = phimapiData.movie || phimapiData.data?.item;
-                if (phimapiMovie) {
-                    const rawImg = phimapiMovie.thumb_url || phimapiMovie.poster_url || '';
-                    movie.thumb_url = normalizeImageUrl(rawImg, 'phimapi');
-                    movie.poster_url = normalizeImageUrl(rawImg, 'phimapi');
-                }
+            phimapiMovie = phimapiRes.value.data.movie || phimapiRes.value.data.data?.item;
+        }
+
+        // Chọn thông tin phim: Ưu tiên Ophim để lấy các thông tin khác, nếu không có thì dùng PhimAPI
+        let movie = ophimMovie || phimapiMovie;
+
+        if (movie) {
+            // Xử lý hình ảnh: Ưu tiên ảnh Ophim, nếu Ophim thiếu/trống thì lấy ảnh PhimAPI
+            let rawImgOphim = ophimMovie?.thumb_url || ophimMovie?.poster_url || ophimMovie?.thumb || '';
+            let rawImgPhimapi = phimapiMovie?.thumb_url || phimapiMovie?.poster_url || phimapiMovie?.thumb || '';
+
+            let finalImg = normalizeImageUrl(rawImgOphim, 'ophim');
+            if (!rawImgOphim || finalImg.includes('No+Image')) {
+                finalImg = normalizeImageUrl(rawImgPhimapi, 'phimapi');
             }
 
-            const phimapiServers = phimapiData.episodes || phimapiData.data?.episodes || [];
-            phimapiServers.forEach((srv, idx) => {
-                combinedServers.push({
-                    server_name: `PhimAPI - ${srv.server_name || srv.name || `Server #${idx + 1}`}`,
-                    server_data: srv.server_data || srv.items || srv
-                });
-            });
+            movie.thumb_url = finalImg || 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
+            movie.poster_url = finalImg || 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
         }
+
+        // Xử lý Server / Tập phim: Ưu tiên đưa PhimAPI lên đầu vì update nhanh, sau đó đến Ophim
+        const phimapiServers = phimapiRes.status === 'fulfilled' ? (phimapiRes.value.data.episodes || phimapiRes.value.data.data?.episodes || []) : [];
+        const ophimServers = ophimRes.status === 'fulfilled' && ophimRes.value.data.status ? (ophimRes.value.data.data.episodes || ophimRes.value.data.data?.item?.episodes || []) : [];
+
+        phimapiServers.forEach((srv, idx) => {
+            combinedServers.push({
+                server_name: `PhimAPI - ${srv.server_name || srv.name || `Server #${idx + 1}`}`,
+                server_data: srv.server_data || srv.items || srv
+            });
+        });
+
+        ophimServers.forEach((srv, idx) => {
+            combinedServers.push({
+                server_name: `Ophim - ${srv.server_name || srv.name || `Server #${idx + 1}`}`,
+                server_data: srv.server_data || srv.items || srv
+            });
+        });
 
         if (!movie && combinedServers.length === 0) {
             return res.status(404).json({ status: false, message: "Không tìm thấy phim ở cả 2 nguồn" });
