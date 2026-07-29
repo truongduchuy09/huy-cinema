@@ -16,18 +16,15 @@ function normalizeEpisode(epText) {
     return `Tập ${clean}`;
 }
 
-// Hàm chuẩn hóa URL hình ảnh thông minh (Chống lặp đường dẫn uploads/movies)
+// Hàm chuẩn hóa URL hình ảnh thông minh
 function normalizeImageUrl(url, source = 'ophim') {
-    if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
+    if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
 
     const domain = source === 'phimapi' ? 'https://img.phimapi.com' : 'https://img.ophim.live';
-    
-    // Dọn dẹp các ký tự thừa / dấu gạch chéo đầu tiên
     let cleanPath = url.trim();
     if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
 
-    // Nếu path đã chứa sẵn thư mục gốc thì chỉ việc ghép domain
     if (cleanPath.startsWith('uploads/movies/') || cleanPath.startsWith('uploads/')) {
         return `${domain}/${cleanPath}`;
     }
@@ -35,11 +32,10 @@ function normalizeImageUrl(url, source = 'ophim') {
         return `${domain}/uploads/${cleanPath}`;
     }
 
-    // Mặc định nối vào thư mục chuẩn
     return `${domain}/uploads/movies/${cleanPath}`;
 }
 
-// API: Lấy danh sách phim (Trang chủ & Danh mục - Kết hợp PhimAPI + Ophim)
+// API: Lấy danh sách phim (Trang chủ & Danh mục)
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
@@ -58,10 +54,10 @@ app.get('/api/movies', async (req, res) => {
             axios.get(phimapiUrl)
         ]);
 
-        const movieMap = new Map();
+        const phimapiMap = new Map();
         let totalPages = 1;
 
-        // 1. Lấy từ PhimAPI trước (để có phim mới cập nhật nhanh)
+        // 1. Lưu dữ liệu PhimAPI trước
         if (phimapiRes.status === 'fulfilled') {
             const data = phimapiRes.value.data;
             const items = data.items || data.data?.items || [];
@@ -71,7 +67,7 @@ app.get('/api/movies', async (req, res) => {
                 const slug = item.slug;
                 if (slug) {
                     const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
-                    movieMap.set(slug, {
+                    phimapiMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'phimapi'),
                         poster_url: normalizeImageUrl(rawImg, 'phimapi'),
@@ -81,7 +77,9 @@ app.get('/api/movies', async (req, res) => {
             });
         }
 
-        // 2. Lấy từ Ophim sau và ghi đè (Ưu tiên ảnh đẹp của Ophim cho các phim trùng)
+        const finalMoviesMap = new Map();
+
+        // 2. Duyệt qua Ophim: Ưu tiên ảnh Ophim, nếu Ophim trống ảnh thì tự động lấy ảnh PhimAPI bù vào
         if (ophimRes.status === 'fulfilled') {
             const data = ophimRes.value.data;
             const items = data.data?.items || [];
@@ -92,19 +90,33 @@ app.get('/api/movies', async (req, res) => {
                 const slug = item.slug;
                 if (slug) {
                     const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
-                    movieMap.set(slug, {
+                    let imageUrl = normalizeImageUrl(rawImg, 'ophim');
+
+                    // Nếu ảnh bên Ophim bị rỗng mà PhimAPI có -> Lấy ảnh PhimAPI dùng tạm
+                    if (!rawImg && phimapiMap.has(slug)) {
+                        imageUrl = phimapiMap.get(slug).thumb_url;
+                    }
+
+                    finalMoviesMap.set(slug, {
                         ...item,
-                        thumb_url: normalizeImageUrl(rawImg, 'ophim'),
-                        poster_url: normalizeImageUrl(rawImg, 'ophim'),
+                        thumb_url: imageUrl || 'https://placehold.co/300x400/121218/ffffff?text=No+Image',
+                        poster_url: imageUrl || 'https://placehold.co/300x400/121218/ffffff?text=No+Image',
                         episode_current: normalizeEpisode(item.episode_current)
                     });
                 }
             });
         }
 
+        // 3. Đưa thêm các phim chỉ có ở PhimAPI vào danh sách
+        phimapiMap.forEach((item, slug) => {
+            if (!finalMoviesMap.has(slug)) {
+                finalMoviesMap.set(slug, item);
+            }
+        });
+
         res.json({
             status: true,
-            items: Array.from(movieMap.values()),
+            items: Array.from(finalMoviesMap.values()),
             totalPages: totalPages
         });
     } catch (error) {
@@ -113,7 +125,7 @@ app.get('/api/movies', async (req, res) => {
     }
 });
 
-// API: Tìm kiếm (Kết hợp cả 2 nguồn)
+// API: Tìm kiếm (Áp dụng logic tương tự)
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
@@ -124,9 +136,8 @@ app.get('/api/search', async (req, res) => {
             axios.get(`https://phimapi.com/v1/api/tim-kiem?keyword=${searchUrl}&limit=20`)
         ]);
 
-        const movieMap = new Map();
+        const phimapiMap = new Map();
 
-        // 1. Tìm từ PhimAPI trước
         if (phimapiRes.status === 'fulfilled') {
             const data = phimapiRes.value.data;
             const items = data.items || data.data?.items || [];
@@ -134,7 +145,7 @@ app.get('/api/search', async (req, res) => {
                 const slug = item.slug;
                 if (slug) {
                     const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
-                    movieMap.set(slug, {
+                    phimapiMap.set(slug, {
                         ...item,
                         thumb_url: normalizeImageUrl(rawImg, 'phimapi'),
                         poster_url: normalizeImageUrl(rawImg, 'phimapi'),
@@ -144,7 +155,8 @@ app.get('/api/search', async (req, res) => {
             });
         }
 
-        // 2. Tìm từ Ophim sau và ghi đè
+        const finalSearchMap = new Map();
+
         if (ophimRes.status === 'fulfilled') {
             const data = ophimRes.value.data;
             const items = data.data?.items || [];
@@ -152,19 +164,31 @@ app.get('/api/search', async (req, res) => {
                 const slug = item.slug;
                 if (slug) {
                     const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
-                    movieMap.set(slug, {
+                    let imageUrl = normalizeImageUrl(rawImg, 'ophim');
+
+                    if (!rawImg && phimapiMap.has(slug)) {
+                        imageUrl = phimapiMap.get(slug).thumb_url;
+                    }
+
+                    finalSearchMap.set(slug, {
                         ...item,
-                        thumb_url: normalizeImageUrl(rawImg, 'ophim'),
-                        poster_url: normalizeImageUrl(rawImg, 'ophim'),
+                        thumb_url: imageUrl || 'https://placehold.co/300x400/121218/ffffff?text=No+Image',
+                        poster_url: imageUrl || 'https://placehold.co/300x400/121218/ffffff?text=No+Image',
                         episode_current: normalizeEpisode(item.episode_current)
                     });
                 }
             });
         }
 
+        phimapiMap.forEach((item, slug) => {
+            if (!finalSearchMap.has(slug)) {
+                finalSearchMap.set(slug, item);
+            }
+        });
+
         res.json({
             status: true,
-            items: Array.from(movieMap.values())
+            items: Array.from(finalSearchMap.values())
         });
     } catch (error) {
         console.error("Lỗi tìm kiếm phim:", error.message);
@@ -213,6 +237,14 @@ app.get('/api/movie/:slug', async (req, res) => {
                 movie = phimapiData.movie || phimapiData.data?.item;
                 if (movie) {
                     const rawImg = movie.thumb_url || movie.poster_url || movie.thumb || '';
+                    movie.thumb_url = normalizeImageUrl(rawImg, 'phimapi');
+                    movie.poster_url = normalizeImageUrl(rawImg, 'phimapi');
+                }
+            } else if (movie && (!movie.thumb_url || movie.thumb_url.includes('No+Image'))) {
+                // Nếu phim có ở Ophim nhưng thiếu ảnh, bổ sung ảnh từ PhimAPI
+                const phimapiMovie = phimapiData.movie || phimapiData.data?.item;
+                if (phimapiMovie) {
+                    const rawImg = phimapiMovie.thumb_url || phimapiMovie.poster_url || '';
                     movie.thumb_url = normalizeImageUrl(rawImg, 'phimapi');
                     movie.poster_url = normalizeImageUrl(rawImg, 'phimapi');
                 }
