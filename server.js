@@ -45,8 +45,9 @@ app.get('/api/movies', async (req, res) => {
             ? `https://ophim1.com/v1/api/home?page=${page}`
             : `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
 
+        // Sửa đúng endpoint PhimAPI cho trang chủ (phim mới cập nhật)
         const phimapiUrl = category === 'all'
-            ? `https://phimapi.com/v1/api/home?page=${page}`
+            ? `https://phimapi.com/danh-sach/phim-moi-cap-nhat?page=${page}`
             : `https://phimapi.com/v1/api/danh-sach/${category}?page=${page}`;
 
         const [ophimRes, phimapiRes] = await Promise.allSettled([
@@ -60,8 +61,8 @@ app.get('/api/movies', async (req, res) => {
         // 1. Lưu dữ liệu PhimAPI trước
         if (phimapiRes.status === 'fulfilled') {
             const data = phimapiRes.value.data;
-            const items = data.items || data.data?.items || [];
-            totalPages = data.params?.pagination?.totalPages || data.data?.params?.pagination?.totalPages || 1;
+            const items = data.items || data.data?.items || data.data?.data?.items || [];
+            totalPages = data.pagination?.totalPages || data.data?.params?.pagination?.totalPages || data.data?.pagination?.totalPages || 1;
             
             items.forEach(item => {
                 const slug = item.slug;
@@ -80,12 +81,12 @@ app.get('/api/movies', async (req, res) => {
 
         const finalMoviesMap = new Map();
 
-        // 2. Ưu tiên đưa phim độc quyền hoặc phim mới từ PhimAPI lên trước (để chắc chắn phim mới hiển thị)
+        // 2. Đưa PhimAPI lên đầu danh sách
         phimapiMap.forEach((item, slug) => {
             finalMoviesMap.set(slug, item);
         });
 
-        // 3. Duyệt qua Ophim: Ghi đè thông tin/ảnh của Ophim vào các phim trùng, giữ nguyên phim mới của PhimAPI
+        // 3. Duyệt qua Ophim: Ưu tiên ảnh Ophim, nếu Ophim chưa có ảnh thì lấy ảnh PhimAPI bù vào
         if (ophimRes.status === 'fulfilled') {
             const data = ophimRes.value.data;
             const items = data.data?.items || [];
@@ -98,7 +99,6 @@ app.get('/api/movies', async (req, res) => {
                     const rawImg = item.thumb_url || item.poster_url || item.thumb || '';
                     let imageUrl = normalizeImageUrl(rawImg, 'ophim');
 
-                    // Nếu Ophim có ảnh thì dùng ảnh Ophim, nếu không giữ lại ảnh PhimAPI cũ
                     if (!imageUrl || imageUrl.includes('No+Image')) {
                         if (phimapiMap.has(slug)) {
                             imageUrl = phimapiMap.get(slug).thumb_url;
