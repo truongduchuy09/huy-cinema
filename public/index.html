@@ -22,7 +22,6 @@
             background-attachment: fixed;
         }
 
-        /* Scrollbar tùy chỉnh */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -31,7 +30,6 @@
         ::-webkit-scrollbar-thumb { background: #22222e; border-radius: 20px; }
         ::-webkit-scrollbar-thumb:hover { background: #e50914; }
 
-        /* HEADER & PANEL GLASSMORPHISM */
         .glass-header {
             background: rgba(10, 10, 14, 0.7);
             backdrop-filter: blur(24px);
@@ -48,7 +46,6 @@
             box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
         }
 
-        /* THẺ PHIM VIP VỚI BÓNG NỔI & HIỆU ỨNG QUÉT SÁNG */
         .vip-card {
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(12px);
@@ -60,7 +57,6 @@
             overflow: hidden;
         }
 
-        /* Quét sáng kim loại khi hover card */
         .vip-card::after {
             content: '';
             position: absolute;
@@ -95,7 +91,6 @@
                 inset 0 1px 2px rgba(255, 255, 255, 0.4);
         }
 
-        /* NÚT BẤM BÓNG NỔI VIP (PRIMARY) */
         .vip-btn-primary {
             background: linear-gradient(135deg, #e50914 0%, #b91c1c 100%);
             border: 1px solid rgba(255, 255, 255, 0.25);
@@ -113,7 +108,6 @@
             transform: translateY(1px) scale(0.97);
         }
 
-        /* NÚT BẤM BÓNG NỔI VIP (SECONDARY / GLASS) */
         .vip-btn-secondary {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(12px);
@@ -134,7 +128,6 @@
             transform: translateY(1px) scale(0.97);
         }
 
-        /* Ô TÌM KIẾM BÓNG NỔI VIP */
         .vip-input {
             background: rgba(255, 255, 255, 0.04);
             backdrop-filter: blur(16px);
@@ -149,7 +142,6 @@
             background: rgba(0, 0, 0, 0.7);
         }
 
-        /* BADGES BO TRÒN VIP */
         .vip-badge {
             background: rgba(0, 0, 0, 0.55);
             backdrop-filter: blur(14px);
@@ -170,11 +162,9 @@
 </head>
 <body class="text-gray-100 min-h-screen antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- HEADER GLASSMORPHISM -->
+    <!-- HEADER -->
     <header class="glass-header sticky top-0 z-50 transition-all duration-300">
         <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            
-            <!-- Logo VIP -->
             <div class="flex items-center gap-3 cursor-pointer select-none group" onclick="goHome()">
                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-700 via-red-600 to-rose-500 flex items-center justify-center font-black text-2xl text-white shadow-[0_0_20px_rgba(229,9,20,0.7)] group-hover:scale-110 group-hover:rotate-3 transition duration-300 border border-white/30">
                     H
@@ -184,7 +174,6 @@
                 </span>
             </div>
 
-            <!-- Ô tìm kiếm VIP -->
             <div class="flex w-full sm:w-auto gap-3">
                 <div class="relative w-full sm:w-80">
                     <input type="text" id="searchInput" placeholder="Tìm kiếm phim, diễn viên..." class="vip-input w-full px-5 py-2.5 rounded-full text-sm placeholder-gray-400 text-white focus:outline-none">
@@ -195,7 +184,6 @@
             </div>
         </div>
 
-        <!-- MENU DANH MỤC VIP -->
         <nav class="border-t border-white/[0.06] bg-black/30">
             <div class="container mx-auto px-4 flex overflow-x-auto gap-3 py-3 scrollbar-hide text-xs font-bold">
                 <button onclick="selectCategory('all')" id="cat-all" class="cat-btn vip-btn-primary text-white px-5 py-2.5 rounded-full whitespace-nowrap">Mới Cập Nhật</button>
@@ -209,28 +197,35 @@
 
     <main class="container mx-auto px-4 py-8">
         
-        <!-- TRÌNH PHÁT VIDEO CINEMATIC -->
+        <!-- PLAYER -->
         <section id="playerSection" class="hidden mb-12 glass-panel p-5 sm:p-7 rounded-3xl relative overflow-hidden">
             <div class="absolute -top-28 -left-28 w-80 h-80 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
             
-            <div class="flex justify-between items-center mb-4 relative z-10">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 relative z-10">
                 <div class="flex items-center gap-3">
                     <span class="w-3.5 h-3.5 rounded-full bg-red-600 animate-ping"></span>
                     <h2 id="playingTitle" class="text-base sm:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 truncate">
                         Đang tải phim...
                     </h2>
                 </div>
-                <button onclick="closePlayer()" class="vip-btn-secondary text-gray-300 hover:text-white text-xs px-4 py-2 rounded-full font-bold">
-                    Đóng [X]
-                </button>
+                
+                <div class="flex items-center gap-2">
+                    <!-- Nút chuyển đổi Player M3U8 / Embed -->
+                    <button id="togglePlayerBtn" onclick="togglePlayerMode()" class="vip-btn-secondary text-xs px-3.5 py-1.5 rounded-full font-bold text-yellow-400 border border-yellow-500/30">
+                        Chế độ: VIP Player (HLS)
+                    </button>
+                    <button onclick="closePlayer()" class="vip-btn-secondary text-gray-300 hover:text-white text-xs px-4 py-1.5 rounded-full font-bold">
+                        Đóng [X]
+                    </button>
+                </div>
             </div>
 
-            <!-- Video Player Box -->
-            <div class="aspect-video w-full max-w-5xl mx-auto bg-black/95 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.95)] border border-white/10 relative z-10">
+            <!-- Video Box (Hỗ trợ cả HTML5 Video & Iframe Embed) -->
+            <div id="playerContainer" class="aspect-video w-full max-w-5xl mx-auto bg-black/95 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.95)] border border-white/10 relative z-10">
                 <video id="videoPlayer" controls class="w-full h-full"></video>
+                <iframe id="iframePlayer" class="w-full h-full hidden" frameborder="0" allowfullscreen></iframe>
             </div>
             
-            <!-- Servers & Tập Phim -->
             <div class="mt-7 space-y-6 max-w-5xl mx-auto relative z-10">
                 <div id="serverContainer">
                     <h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider mb-3">Chọn Nguồn Phát (Server):</h3>
@@ -244,7 +239,7 @@
             </div>
         </section>
 
-        <!-- LỊCH SỬ XEM PHIM -->
+        <!-- LỊCH SỬ -->
         <section id="historySection" class="hidden mb-10">
             <div class="flex justify-between items-center mb-4">
                 <div class="flex items-center gap-2.5">
@@ -264,10 +259,8 @@
             </h2>
         </div>
 
-        <!-- DANH SÁCH PHIM (GRID) -->
         <div id="movieGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 md:gap-7"></div>
 
-        <!-- PHÂN TRANG -->
         <div id="pagination" class="flex justify-center items-center gap-4 mt-12">
             <button id="prevBtn" onclick="changePage(-1)" class="vip-btn-secondary px-6 py-2.5 rounded-full text-xs font-bold disabled:opacity-20 disabled:cursor-not-allowed">
                 &larr; Trang trước
@@ -293,6 +286,7 @@
 
         let currentMovieDetail = null;
         let currentServers = [];
+        let playerMode = 'm3u8'; // 'm3u8' hoặc 'embed'
 
         const categoryNames = {
             'all': 'Phim Mới Cập Nhật',
@@ -404,7 +398,6 @@
                         <div class="relative aspect-[3/4] bg-black/40 overflow-hidden">
                             <img src="${movie.thumb_url}" alt="${movie.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 ease-out" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/121218/ffffff?text=No+Image'">
                             
-                            <!-- Badges BO TRÒN VIP -->
                             <span class="absolute top-3 left-3 vip-badge text-[10px] px-3 py-1 rounded-full font-black text-white z-10">
                                 ${movie.episode_current}
                             </span>
@@ -491,32 +484,49 @@
                         b.className = 'vip-btn-secondary text-white px-3.5 py-1.5 text-xs rounded-full min-w-[44px] ep-btn';
                     });
                     btn.className = 'vip-btn-primary font-bold text-white px-3.5 py-1.5 text-xs rounded-full min-w-[44px] ep-btn';
-                    playVideo(ep.link_m3u8, ep.name, currentMovieDetail);
+                    playVideo(ep, currentMovieDetail);
                 };
                 
                 epListContainer.appendChild(btn);
                 if (isTarget) targetEpisode = ep;
             });
 
-            playVideo(targetEpisode.link_m3u8, targetEpisode.name, currentMovieDetail);
+            playVideo(targetEpisode, currentMovieDetail);
         }
 
-        function playVideo(url, epName, movieData) {
+        function playVideo(episodeObj, movieData) {
             const video = document.getElementById('videoPlayer');
+            const iframe = document.getElementById('iframePlayer');
 
             currentPlaying = {
                 slug: movieData.slug,
                 name: movieData.name,
                 origin_name: movieData.origin_name,
                 thumb_url: movieData.thumb_url,
-                epName: epName,
-                url: url
+                epName: episodeObj.name,
+                url: episodeObj.link_m3u8,
+                embed: episodeObj.link_embed
             };
 
-            document.getElementById('playingTitle').innerText = `${movieData.name} - Tập ${epName}`;
+            document.getElementById('playingTitle').innerText = `${movieData.name} - Tập ${episodeObj.name}`;
+
+            if (playerMode === 'embed' || !episodeObj.link_m3u8) {
+                loadEmbedPlayer(episodeObj.link_embed);
+            } else {
+                loadHlsPlayer(episodeObj.link_m3u8, episodeObj.link_embed, movieData);
+            }
+        }
+
+        function loadHlsPlayer(m3u8Url, embedUrl, movieData) {
+            const video = document.getElementById('videoPlayer');
+            const iframe = document.getElementById('iframePlayer');
+            
+            iframe.classList.add('hidden');
+            iframe.src = "";
+            video.classList.remove('hidden');
 
             const history = getHistory();
-            const savedItem = history.find(h => h.slug === movieData.slug && h.epName === epName);
+            const savedItem = history.find(h => h.slug === movieData.slug && h.epName === currentPlaying.epName);
             const savedTime = savedItem ? savedItem.position : 0;
 
             if (hls) {
@@ -526,18 +536,56 @@
 
             if (Hls.isSupported()) {
                 hls = new Hls({ maxBufferLength: 30 });
-                hls.loadSource(url);
+                hls.loadSource(m3u8Url);
                 hls.attachMedia(video);
+                
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play().catch(() => {});
                 });
+
+                // Tự động chuyển qua Embed nếu M3U8 bị lỗi CORS / Network
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        console.warn("Lỗi HLS m3u8, tự động chuyển sang Embed Player...", data);
+                        loadEmbedPlayer(embedUrl);
+                    }
+                });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = m3u8Url;
                 video.addEventListener('loadedmetadata', function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play().catch(() => {});
                 }, { once: true });
+            } else {
+                loadEmbedPlayer(embedUrl);
+            }
+        }
+
+        function loadEmbedPlayer(embedUrl) {
+            const video = document.getElementById('videoPlayer');
+            const iframe = document.getElementById('iframePlayer');
+
+            video.pause();
+            video.classList.add('hidden');
+            if (hls) { hls.destroy(); hls = null; }
+
+            iframe.classList.remove('hidden');
+            iframe.src = embedUrl;
+
+            document.getElementById('togglePlayerBtn').innerText = "Chế độ: Embed (Dự phòng)";
+            playerMode = 'embed';
+        }
+
+        function togglePlayerMode() {
+            if (!currentPlaying) return;
+            if (playerMode === 'm3u8') {
+                playerMode = 'embed';
+                loadEmbedPlayer(currentPlaying.embed);
+            } else {
+                playerMode = 'm3u8';
+                document.getElementById('togglePlayerBtn').innerText = "Chế độ: VIP Player (HLS)";
+                loadHlsPlayer(currentPlaying.url, currentPlaying.embed, currentMovieDetail);
             }
         }
 
@@ -613,14 +661,16 @@
 
         function closePlayer() {
             const video = document.getElementById('videoPlayer');
+            const iframe = document.getElementById('iframePlayer');
+
             if (currentPlaying && video.duration > 0) {
                 saveHistoryItem(currentPlaying, video.currentTime, video.duration);
             }
+
             video.pause();
-            if (hls) {
-                hls.destroy();
-                hls = null;
-            }
+            iframe.src = "";
+            if (hls) { hls.destroy(); hls = null; }
+
             document.getElementById('playerSection').classList.add('hidden');
             currentPlaying = null;
             if (currentPage === 1 && currentCategory === 'all') renderHistory();
