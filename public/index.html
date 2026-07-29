@@ -14,14 +14,26 @@
 </head>
 <body class="bg-gray-900 text-white font-sans">
 
-    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg border-b border-gray-700">
-        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+    <!-- HEADER + MENU DANH MỤC -->
+    <header class="bg-gray-800 sticky top-0 z-50 shadow-lg border-b border-gray-700">
+        <div class="container mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-red-500 cursor-pointer select-none hover:opacity-80 transition" onclick="goHome()">Huy Cinema</h1>
             <div class="flex w-full sm:w-auto gap-2">
                 <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500 text-sm">
                 <button onclick="searchMovie()" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded font-medium text-sm transition">Tìm</button>
             </div>
         </div>
+
+        <!-- THANH DANH MỤC PHIM -->
+        <nav class="bg-gray-800/90 border-t border-gray-700/50">
+            <div class="container mx-auto px-4 flex overflow-x-auto gap-2 py-2 scrollbar-hide text-sm">
+                <button onclick="selectCategory('all')" id="cat-all" class="cat-btn bg-red-600 px-3 py-1.5 rounded font-medium whitespace-nowrap transition">Mới Cập Nhật</button>
+                <button onclick="selectCategory('phim-bo')" id="cat-phim-bo" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded font-medium whitespace-nowrap transition">Phim Bộ</button>
+                <button onclick="selectCategory('phim-le')" id="cat-phim-le" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded font-medium whitespace-nowrap transition">Phim Lẻ</button>
+                <button onclick="selectCategory('hoat-hinh')" id="cat-hoat-hinh" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded font-medium whitespace-nowrap transition">Hoạt Hình</button>
+                <button onclick="selectCategory('tv-shows')" id="cat-tv-shows" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded font-medium whitespace-nowrap transition">TV Shows</button>
+            </div>
+        </nav>
     </header>
 
     <main class="container mx-auto px-4 py-8">
@@ -74,6 +86,8 @@
         const API_BASE = "/api";
         let currentPage = 1;
         let totalPages = 1;
+        let currentCategory = 'all'; // Default
+        
         let hls = null;
         let currentPlaying = null;
         let saveTimeout = null;
@@ -81,23 +95,44 @@
         let currentMovieDetail = null;
         let currentServers = [];
 
+        const categoryNames = {
+            'all': 'Phim Mới Cập Nhật',
+            'phim-bo': 'Phim Bộ',
+            'phim-le': 'Phim Lẻ',
+            'hoat-hinh': 'Hoạt Hình',
+            'tv-shows': 'TV Shows'
+        };
+
         function goHome() {
             document.getElementById('searchInput').value = "";
             closePlayer();
+            selectCategory('all');
+        }
+
+        function selectCategory(cat) {
+            currentCategory = cat;
+            
+            // Highlight nút active
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.replace('bg-red-600', 'bg-gray-700');
+            });
+            const activeBtn = document.getElementById(`cat-${cat}`);
+            if (activeBtn) activeBtn.classList.replace('bg-gray-700', 'bg-red-600');
+
             loadMovies(1);
         }
 
         async function loadMovies(page) {
             currentPage = page;
             document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ...`;
-            document.getElementById('sectionTitle').innerText = "Phim Mới Cập Nhật";
+            document.getElementById('sectionTitle').innerText = categoryNames[currentCategory] || "Danh Sách Phim";
             document.getElementById('pagination').classList.remove('hidden');
 
-            if (page === 1) renderHistory();
+            if (page === 1 && currentCategory === 'all') renderHistory();
             else document.getElementById('historySection').classList.add('hidden');
 
             try {
-                const res = await fetch(`${API_BASE}/movies?page=${page}`);
+                const res = await fetch(`${API_BASE}/movies?page=${page}&category=${currentCategory}`);
                 const data = await res.json();
                 
                 if (data.status) {
@@ -351,7 +386,7 @@
             if (hls) hls.destroy();
             document.getElementById('playerSection').classList.add('hidden');
             currentPlaying = null;
-            if (currentPage === 1) renderHistory();
+            if (currentPage === 1 && currentCategory === 'all') renderHistory();
         }
 
         function changePage(step) {
