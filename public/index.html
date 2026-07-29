@@ -109,7 +109,7 @@
                 </span>
             </div>
 
-            <!-- SEARCH BAR (Gọn gàng trên Mobile) -->
+            <!-- SEARCH BAR -->
             <div class="w-full sm:w-80 relative flex items-center">
                 <input 
                     type="text" 
@@ -126,7 +126,7 @@
             </div>
         </div>
 
-        <!-- DANH MỤC PHIM (Vuốt ngang mượt trên Mobile) -->
+        <!-- DANH MỤC PHIM -->
         <nav class="border-t border-white/[0.06] bg-black/30">
             <div class="container mx-auto px-4 flex overflow-x-auto gap-2 py-2.5 scrollbar-hide text-xs font-bold">
                 <button onclick="selectCategory('all')" id="cat-all" class="cat-btn vip-btn-primary text-white px-4 py-2 rounded-full whitespace-nowrap shrink-0">Mới Cập Nhật</button>
@@ -243,7 +243,6 @@
             'tv-shows': 'Chương Trình TV Shows'
         };
 
-        // Hiệu ứng Skeleton Loading
         function showSkeletons() {
             const grid = document.getElementById('movieGrid');
             grid.innerHTML = "";
@@ -260,14 +259,12 @@
             }
         }
 
-        // Quay lại trang chủ
         function goHome() {
             document.getElementById('searchInput').value = "";
             closePlayer();
             selectCategory('all');
         }
 
-        // Chọn danh mục
         function selectCategory(cat) {
             currentCategory = cat;
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -280,7 +277,6 @@
             loadMovies(1);
         }
 
-        // Tải danh sách phim
         async function loadMovies(page) {
             currentPage = page;
             showSkeletons();
@@ -308,7 +304,6 @@
             }
         }
 
-        // Tìm kiếm phim
         async function searchMovie() {
             const keyword = document.getElementById('searchInput').value.trim();
             if (!keyword) return;
@@ -331,7 +326,6 @@
             if (e.key === 'Enter') searchMovie();
         });
 
-        // Render danh sách thẻ Phim (Không vỡ layout mobile)
         function renderMovies(movies) {
             const grid = document.getElementById('movieGrid');
             grid.innerHTML = "";
@@ -346,18 +340,25 @@
                 card.className = "vip-card rounded-2xl overflow-hidden cursor-pointer group flex flex-col justify-between relative";
                 card.onclick = () => watchMovie(item.slug);
 
+                // Chuẩn hóa chuỗi tập phim để không bị lặp chữ "Tập"
+                let epText = item.episode_current || 'Full';
+                let displayEp = epText;
+                if (epText.toLowerCase() !== 'full' && !epText.toLowerCase().startsWith('tập')) {
+                    displayEp = `Tập ${epText}`;
+                }
+
                 card.innerHTML = `
                     <div>
                         <div class="relative aspect-[2/3] bg-black/40 overflow-hidden">
                             <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/121218/ffffff?text=No+Image'">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-                            <!-- Badges Cập nhật & Vietsub tự co giãn đẹp mắt -->
+                            <!-- Badges chuẩn hóa chống lặp chữ -->
                             <div class="absolute top-1.5 left-1.5 right-1.5 flex flex-wrap gap-1 z-10">
-                                <span class="bg-black/70 backdrop-blur-md text-gray-200 text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-md border border-white/10">
-                                    ${item.episode_current || 'Full'}
+                                <span class="bg-black/90 text-gray-200 text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-md border border-white/10">
+                                    ${displayEp}
                                 </span>
-                                <span class="bg-red-600/90 text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                <span class="bg-red-600 text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md">
                                     ${item.lang || 'Vietsub'}
                                 </span>
                             </div>
@@ -372,7 +373,6 @@
             });
         }
 
-        // Xem phim theo slug
         async function watchMovie(slug, autoPlayEpName = null, activeServerIdx = 0) {
             try {
                 const res = await fetch(`${API_BASE}/movie/${slug}`);
@@ -393,7 +393,6 @@
             }
         }
 
-        // Render Tabs Chọn Server (Ophim vs Phimapi)
         function renderServerTabs(selectedServerIdx, autoPlayEpName = null) {
             const serverListContainer = document.getElementById('serverList');
             serverListContainer.innerHTML = "";
@@ -415,7 +414,6 @@
             renderEpisodes(selectedServerIdx, autoPlayEpName);
         }
 
-        // Render Tập phim
         function renderEpisodes(serverIdx, autoPlayEpName = null) {
             const epListContainer = document.getElementById('episodeList');
             epListContainer.innerHTML = "";
@@ -452,8 +450,12 @@
             playVideo(targetEpisode, currentMovieDetail);
         }
 
-        // Phát Video
         function playVideo(episodeObj, movieData) {
+            if (!episodeObj.link_m3u8 && !episodeObj.link_embed) {
+                alert("Tập phim này mới cập nhật, nguồn phát chưa sẵn sàng. Vui lòng chọn server khác!");
+                return;
+            }
+
             currentPlaying = {
                 slug: movieData.slug,
                 name: movieData.name,
@@ -472,7 +474,6 @@
             }
         }
 
-        // Trình phát HLS
         function loadHlsPlayer(m3u8Url, embedUrl) {
             const video = document.getElementById('videoPlayer');
             const iframe = document.getElementById('iframePlayer');
@@ -499,7 +500,6 @@
             }
         }
 
-        // Trình phát Embed (Iframe dự phòng)
         function loadEmbedPlayer(embedUrl) {
             const video = document.getElementById('videoPlayer');
             const iframe = document.getElementById('iframePlayer');
@@ -515,7 +515,6 @@
             playerMode = 'embed';
         }
 
-        // Chuyển đổi chế độ Player
         function togglePlayerMode() {
             if (!currentPlaying) return;
             if (playerMode === 'm3u8') {
@@ -528,7 +527,6 @@
             }
         }
 
-        // Quản lý lịch sử xem phim
         function getHistory() {
             return JSON.parse(localStorage.getItem('huy_cinema_history')) || [];
         }
@@ -593,14 +591,12 @@
             if (currentPage === 1 && currentCategory === 'all') renderHistory();
         }
 
-        // Chuyển trang
         function changePage(step) {
             let targetPage = currentPage + step;
             if (targetPage < 1 || targetPage > totalPages) return;
             loadMovies(targetPage);
         }
 
-        // Khởi chạy khi load trang lần đầu
         loadMovies(1);
     </script>
 </body>
