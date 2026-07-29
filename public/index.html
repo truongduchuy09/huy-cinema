@@ -340,7 +340,7 @@
                 card.className = "vip-card rounded-2xl overflow-hidden cursor-pointer group flex flex-col justify-between relative";
                 card.onclick = () => watchMovie(item.slug);
 
-                // Chuẩn hóa triệt để chuỗi tập phim bằng Regex để chống lặp chữ "Tập"
+                // Chuẩn hóa triệt để chuỗi tập phim bằng Regex chống lặp chữ "Tập"
                 let epText = item.episode_current || 'Full';
                 let cleanEp = epText.replace(/tập\s*/gi, '').trim();
                 let displayEp = (cleanEp.toLowerCase() === 'full' || cleanEp === '') ? 'Full' : `Tập ${cleanEp}`;
@@ -351,12 +351,12 @@
                             <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/121218/ffffff?text=No+Image'">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-                            <!-- Badges chuẩn hóa chống lặp -->
-                            <div class="absolute top-1.5 left-1.5 right-1.5 flex flex-wrap gap-1 z-10">
-                                <span class="bg-black/90 text-gray-200 text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-md border border-white/10 shadow">
+                            <!-- Hiệu ứng kính mờ tối (Dark Glassmorphism) cho Badge -->
+                            <div class="absolute top-2 left-2 right-2 flex flex-wrap gap-1.5 z-10">
+                                <span class="bg-black/60 backdrop-blur-md border border-white/15 text-white text-[9px] sm:text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow-lg">
                                     ${displayEp}
                                 </span>
-                                <span class="bg-red-600 text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md">
+                                <span class="bg-red-600/90 backdrop-blur-md border border-red-500/30 text-white text-[9px] sm:text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg">
                                     ${item.lang || 'Vietsub'}
                                 </span>
                             </div>
