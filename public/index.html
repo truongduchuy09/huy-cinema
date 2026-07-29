@@ -8,135 +8,111 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
+        /* Tối ưu thanh cuộn ngang cho mục lịch sử nhìn cho đẹp */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
 
-    <!-- HEADER + THANH TÌM KIẾM -->
-    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg border-b border-gray-700">
+    <header class="bg-gray-800 sticky top-0 z-50 p-4 shadow-lg">
         <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-red-500 cursor-pointer select-none hover:opacity-80 transition" onclick="goHome()">Huy Cinema</h1>
-            
-            <!-- THANH TÌM KIẾM -->
-            <form onsubmit="handleSearch(event)" class="flex w-full sm:w-auto gap-2">
-                <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500 text-sm">
-                <button type="submit" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded font-medium text-sm transition">Tìm</button>
-            </form>
-        </div>
-
-        <!-- DANH MỤC LỌC PHIM -->
-        <div class="container mx-auto flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide text-xs font-semibold">
-            <button onclick="filterCategory('all')" class="cat-btn bg-red-600 px-3 py-1.5 rounded-full transition">Tất Cả</button>
-            <button onclick="filterCategory('phim-bo')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Phim Bộ</button>
-            <button onclick="filterCategory('phim-le')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Phim Lẻ</button>
-            <button onclick="filterCategory('hoat-hinh')" class="cat-btn bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-full transition">Hoạt Hình</button>
+            <div class="flex w-full sm:w-auto gap-2">
+                <input type="text" id="searchInput" placeholder="Nhập tên phim cần tìm..." class="w-full sm:w-80 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500">
+                <button onclick="searchMovie()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-medium transition">Tìm</button>
+            </div>
         </div>
     </header>
 
     <main class="container mx-auto px-4 py-8">
-
         <!-- TRÌNH PHÁT VIDEO -->
-        <section id="playerSection" class="hidden mb-10 bg-gray-800 p-4 rounded-lg shadow-xl border border-gray-700">
+        <section id="playerSection" class="hidden mb-12 bg-gray-800 p-4 rounded-lg shadow-xl">
             <div class="flex justify-between items-center mb-4">
-                <h2 id="playingTitle" class="text-lg md:text-xl font-bold text-yellow-400 line-clamp-1">Đang tải phim...</h2>
-                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-xs bg-gray-700 px-3 py-1.5 rounded">Đóng [X]</button>
+                <h2 id="playingTitle" class="text-xl font-bold text-yellow-400">Đang tải phim...</h2>
+                <button onclick="closePlayer()" class="text-gray-400 hover:text-white text-sm bg-gray-700 px-3 py-1 rounded">Đóng [X]</button>
             </div>
-            
-            <div class="aspect-video w-full max-w-4xl mx-auto bg-black rounded overflow-hidden shadow-2xl">
+            <div class="aspect-video w-full max-w-4xl mx-auto bg-black rounded overflow-hidden">
                 <video id="videoPlayer" controls class="w-full h-full"></video>
             </div>
-
-            <!-- CHỌN SERVER & TẬP -->
-            <div class="mt-6 space-y-4">
-                <div id="serverList" class="flex items-center gap-2 flex-wrap text-sm">
-                    <span class="text-gray-400 font-medium">Nguồn phát:</span>
-                    <!-- Các nút Server sẽ render tại đây -->
+            
+            <!-- KHU VỰC CHỌN SERVER & TẬP PHIM -->
+            <div class="mt-4 space-y-4">
+                <div id="serverContainer">
+                    <h3 class="font-semibold text-gray-300 mb-2">Chọn Server / Nguồn:</h3>
+                    <div id="serverList" class="flex flex-wrap gap-2"></div>
                 </div>
+
                 <div>
-                    <h3 class="font-semibold text-gray-300 mb-2 text-sm">Danh sách tập:</h3>
-                    <div id="episodeList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1"></div>
+                    <h3 class="font-semibold text-gray-300 mb-2">Chọn tập phim:</h3>
+                    <div id="episodeList" class="flex flex-wrap gap-2"></div>
                 </div>
             </div>
         </section>
 
-        <!-- LỊCH SỬ XEM (TIẾP TỤC XEM) -->
+        <!-- MỤC LỊCH SỬ XEM PHIM -->
         <section id="historySection" class="hidden mb-10">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-2">Tiếp Tục Xem</h2>
+                <h2 class="text-xl font-semibold border-l-4 border-blue-500 pl-2">Tiếp Tục Xem</h2>
                 <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 transition">[Xóa lịch sử]</button>
             </div>
-            <div id="historyGrid" class="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x"></div>
+            <div id="historyGrid" class="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x">
+            </div>
         </section>
 
-        <!-- DANH SÁCH PHIM -->
-        <h2 id="sectionTitle" class="text-lg md:text-xl font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
+        <h2 id="sectionTitle" class="text-xl font-semibold mb-6 border-l-4 border-red-500 pl-2">Phim Mới Cập Nhật</h2>
 
-        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6"></div>
+        <!-- DANH SÁCH PHIM -->
+        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        </div>
 
         <!-- PHÂN TRANG -->
-        <div id="pagination" class="flex justify-center gap-4 mt-10">
-            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 text-sm px-4 py-2 rounded disabled:opacity-30 border border-gray-700">Trang trước</button>
-            <span id="pageCurrent" class="self-center text-sm font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 50</span>
-            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 text-sm px-4 py-2 rounded disabled:opacity-30 border border-gray-700">Trang sau</button>
+        <div id="pagination" class="flex justify-center gap-4 mt-12">
+            <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang trước</button>
+            <span id="pageCurrent" class="self-center font-medium bg-gray-800 px-4 py-2 rounded border border-gray-700">Trang 1 / 1</span>
+            <button id="nextBtn" onclick="changePage(1)" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition">Trang sau</button>
         </div>
     </main>
 
     <script>
+        const API_BASE = "/api";
+        
         let currentPage = 1;
-        let currentCategory = 'all';
+        let totalPages = 50; 
         let hls = null;
-        let currentPlaying = null;
-        let currentServersData = [];
-        let activeServerIndex = 0;
+        let currentPlaying = null; 
         let saveTimeout = null;
+
+        // Lưu ngữ cảnh dữ liệu phim hiện tại khi mở phát
+        let currentMovieDetail = null;
+        let currentServers = [];
 
         function goHome() {
             document.getElementById('searchInput').value = "";
-            currentCategory = 'all';
-            updateCategoryUI();
-            closePlayer();
-            loadMovies(1);
-        }
-
-        function updateCategoryUI() {
-            document.querySelectorAll('.cat-btn').forEach(btn => {
-                btn.classList.replace('bg-red-600', 'bg-gray-700');
-            });
-            const activeBtn = Array.from(document.querySelectorAll('.cat-btn')).find(b => 
-                (currentCategory === 'all' && b.innerText === 'Tất Cả') ||
-                (currentCategory === 'phim-bo' && b.innerText === 'Phim Bộ') ||
-                (currentCategory === 'phim-le' && b.innerText === 'Phim Lẻ') ||
-                (currentCategory === 'hoat-hinh' && b.innerText === 'Hoạt Hình')
-            );
-            if (activeBtn) activeBtn.classList.replace('bg-gray-700', 'bg-red-600');
-        }
-
-        function filterCategory(cat) {
-            currentCategory = cat;
-            updateCategoryUI();
             closePlayer();
             loadMovies(1);
         }
 
         async function loadMovies(page) {
             currentPage = page;
-            document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / 50`;
+            document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ${totalPages}`;
             document.getElementById('sectionTitle').innerText = "Phim Mới Cập Nhật";
             document.getElementById('pagination').classList.remove('hidden');
 
-            if (page === 1 && currentCategory === 'all') {
+            if (page === 1) {
                 renderHistory();
             } else {
                 document.getElementById('historySection').classList.add('hidden');
             }
 
             try {
-                const res = await fetch(`/api/movies?page=${page}&category=${currentCategory}`);
+                const res = await fetch(`${API_BASE}/movies?page=${page}`);
                 const data = await res.json();
                 
-                if (data.status && data.items) {
+                if (data.totalPages) totalPages = data.totalPages;
+                document.getElementById('pageCurrent').innerText = `Trang ${currentPage} / ${totalPages}`;
+                
+                if (data.items && data.items.length > 0) {
                     renderMovies(data.items);
                 } else {
                     renderMovies([]);
@@ -144,14 +120,13 @@
 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 document.getElementById('prevBtn').disabled = (currentPage === 1);
-                document.getElementById('nextBtn').disabled = (currentPage >= 50);
+                document.getElementById('nextBtn').disabled = (currentPage >= totalPages);
             } catch (err) {
                 console.error("Lỗi lấy danh sách phim:", err);
             }
         }
 
-        async function handleSearch(e) {
-            e.preventDefault();
+        async function searchMovie() {
             const keyword = document.getElementById('searchInput').value.trim();
             if (!keyword) return;
 
@@ -160,14 +135,11 @@
             document.getElementById('historySection').classList.add('hidden');
 
             try {
-                const res = await fetch(`/api/search?keyword=${encodeURIComponent(keyword)}`);
+                const res = await fetch(`${API_BASE}/search?keyword=${encodeURIComponent(keyword)}`);
                 const data = await res.json();
                 
-                if (data.status && data.items) {
-                    renderMovies(data.items);
-                } else {
-                    renderMovies([]);
-                }
+                let items = data.items || [];
+                renderMovies(items);
             } catch (err) {
                 console.error("Lỗi tìm kiếm:", err);
             }
@@ -178,99 +150,116 @@
             grid.innerHTML = "";
 
             if (!movies || movies.length === 0) {
-                grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-8">Không tìm thấy bộ phim nào.</p>`;
+                grid.innerHTML = `<p class="col-span-full text-center text-gray-400">Không tìm thấy bộ phim nào.</p>`;
                 return;
             }
 
             movies.forEach(movie => {
+                let finalThumb = movie.thumb_url || 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
+                let episodeStatus = movie.episode_current || "Cập nhật";
+
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group border border-gray-700/50";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group";
                 card.onclick = () => watchMovie(movie.slug);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
-                        <img src="${movie.thumb_url}" alt="${movie.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
-                        <span class="absolute top-2 left-2 bg-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow">${movie.episode_current || 'Full'}</span>
-                        <span class="absolute top-2 right-2 bg-gray-900/80 text-[10px] px-1.5 py-0.5 rounded font-bold text-yellow-400 shadow">${movie.source || 'VIP'}</span>
+                        <img src="${finalThumb}" alt="${movie.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
+                        <span class="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold shadow-md z-10">${episodeStatus}</span>
+                        <span class="absolute top-2 right-2 bg-gray-900/80 text-xs px-2 py-1 rounded font-bold text-yellow-400 shadow-md z-10">${movie.lang || 'Vietsub'}</span>
                     </div>
-                    <div class="p-2.5">
-                        <h3 class="font-semibold text-xs line-clamp-1 group-hover:text-red-400 transition">${movie.name}</h3>
-                        <p class="text-[10px] text-gray-400 mt-1">${movie.origin_name || ''} (${movie.year || 'N/A'})</p>
+                    <div class="p-3">
+                        <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-red-400 transition">${movie.name}</h3>
+                        <p class="text-xs text-gray-400 mt-1">${movie.origin_name || ''} (${movie.year || 'N/A'})</p>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        async function watchMovie(slug, autoPlayEpName = null) {
+        async function watchMovie(slug, autoPlayEpName = null, activeServerIdx = 0) {
             try {
-                const res = await fetch(`/api/movie/${slug}`);
+                const res = await fetch(`${API_BASE}/movie/${slug}`);
                 const data = await res.json();
                 
-                if (!data.status) return alert("Không tìm thấy thông tin phim!");
+                if (!data.status) return alert("Không tìm thấy thông tin phim này!");
 
-                const movie = data.movie;
-                currentServersData = data.servers || [];
+                currentMovieDetail = data.movie;
+                currentServers = data.servers || [];
 
                 const playerSection = document.getElementById('playerSection');
                 playerSection.classList.remove('hidden');
                 playerSection.scrollIntoView({ behavior: 'smooth' });
 
-                renderServerButtons(movie, autoPlayEpName);
+                document.getElementById('playingTitle').innerText = `${currentMovieDetail.name} - ${currentMovieDetail.origin_name || ''}`;
+
+                // Hiển thị danh sách Server và Tập phim
+                renderServerTabs(activeServerIdx, autoPlayEpName);
 
             } catch (err) {
-                console.error("Lỗi xem phim:", err);
+                console.error("Lỗi lấy chi tiết phim:", err);
             }
         }
 
-        function renderServerButtons(movieData, autoPlayEpName = null) {
-            const serverContainer = document.getElementById('serverList');
-            serverContainer.innerHTML = `<span class="text-gray-400 font-medium">Nguồn phát:</span>`;
+        function renderServerTabs(selectedServerIdx, autoPlayEpName = null) {
+            const serverListContainer = document.getElementById('serverList');
+            serverListContainer.innerHTML = "";
 
-            if (currentServersData.length === 0) {
-                document.getElementById('episodeList').innerHTML = `<p class="text-gray-400 text-sm">Phim đang cập nhật...</p>`;
+            if (currentServers.length === 0) {
+                serverListContainer.innerHTML = "<p class='text-gray-400 text-sm'>Không có nguồn server nào khả dụng.</p>";
                 return;
             }
 
-            currentServersData.forEach((server, index) => {
+            currentServers.forEach((srv, idx) => {
                 const btn = document.createElement('button');
-                btn.className = `px-3 py-1 text-xs rounded transition ${index === activeServerIndex ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-gray-600'}`;
-                btn.innerText = server.server_name;
-                btn.onclick = () => {
-                    activeServerIndex = index;
-                    renderServerButtons(movieData, autoPlayEpName);
-                };
-                serverContainer.appendChild(btn);
+                const isActive = idx === selectedServerIdx;
+                
+                btn.className = `${isActive ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-gray-600'} text-white px-3 py-1 text-sm rounded transition`;
+                btn.innerText = srv.server_name;
+                btn.onclick = () => renderServerTabs(idx, null);
+                
+                serverListContainer.appendChild(btn);
             });
 
-            renderEpisodes(movieData, currentServersData[activeServerIndex], autoPlayEpName);
+            renderEpisodes(selectedServerIdx, autoPlayEpName);
         }
 
-        function renderEpisodes(movieData, serverObj, autoPlayEpName = null) {
-            const epContainer = document.getElementById('episodeList');
-            epContainer.innerHTML = "";
+        function renderEpisodes(serverIdx, autoPlayEpName = null) {
+            const epListContainer = document.getElementById('episodeList');
+            epListContainer.innerHTML = "";
 
-            const episodes = serverObj?.server_data || [];
-            let targetEp = episodes[0];
+            const activeServer = currentServers[serverIdx];
+            const episodes = activeServer ? activeServer.server_data : [];
+
+            if (!episodes || episodes.length === 0) {
+                epListContainer.innerHTML = "<p class='text-gray-400 text-sm'>Server này chưa cập nhật tập...</p>";
+                return;
+            }
+
+            let targetEpisode = episodes[0];
 
             episodes.forEach((ep) => {
                 const btn = document.createElement('button');
                 const isTarget = autoPlayEpName ? (ep.name === autoPlayEpName) : false;
                 
-                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700 hover:bg-red-600'} text-white px-3 py-1 text-xs rounded transition min-w-[40px] ep-btn`;
+                btn.className = `${isTarget ? 'bg-red-600 font-bold' : 'bg-gray-700'} hover:bg-red-600 text-white px-3 py-1.5 text-sm rounded transition min-w-[50px] ep-btn`;
+                btn.setAttribute('data-epname', ep.name);
                 btn.innerText = ep.name;
                 
                 btn.onclick = () => {
                     document.querySelectorAll('.ep-btn').forEach(b => b.classList.replace('bg-red-600', 'bg-gray-700'));
                     btn.classList.replace('bg-gray-700', 'bg-red-600');
-                    playVideo(ep.link_m3u8, ep.name, movieData);
+                    playVideo(ep.link_m3u8, ep.name, currentMovieDetail);
                 };
                 
-                epContainer.appendChild(btn);
-                if (isTarget) targetEp = ep;
+                epListContainer.appendChild(btn);
+
+                if (isTarget) {
+                    targetEpisode = ep;
+                }
             });
 
-            if (targetEp) playVideo(targetEp.link_m3u8, targetEp.name, movieData);
+            playVideo(targetEpisode.link_m3u8, targetEpisode.name, currentMovieDetail);
         }
 
         function playVideo(url, epName, movieData) {
@@ -279,8 +268,8 @@
             currentPlaying = {
                 slug: movieData.slug,
                 name: movieData.name,
-                origin_name: movieData.origin_name || '',
-                thumb_url: movieData.thumb_url || movieData.poster_url || '',
+                origin_name: movieData.origin_name,
+                thumb_url: movieData.thumb_url || movieData.poster_url || "",
                 epName: epName,
                 url: url
             };
@@ -291,7 +280,9 @@
             const savedItem = history.find(h => h.slug === movieData.slug && h.epName === epName);
             const savedTime = savedItem ? savedItem.position : 0;
 
-            if (hls) hls.destroy();
+            if (hls) {
+                hls.destroy();
+            }
 
             if (Hls.isSupported()) {
                 hls = new Hls();
@@ -301,15 +292,19 @@
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            }
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
                 video.addEventListener('loadedmetadata', function() {
                     if (savedTime > 3) video.currentTime = savedTime;
                     video.play();
                 }, { once: true });
+            } else {
+                alert("Trình duyệt của bạn không hỗ trợ phát định dạng video này.");
             }
         }
 
+        // --- CÁC HÀM XỬ LÝ LỊCH SỬ XEM PHIM (LOCALSTORAGE) ---
         function getHistory() {
             return JSON.parse(localStorage.getItem('huy_cinema_history')) || [];
         }
@@ -323,11 +318,14 @@
             history.unshift({
                 slug: movie.slug,
                 name: movie.name,
+                origin_name: movie.origin_name,
                 thumb_url: movie.thumb_url,
                 epName: movie.epName,
+                url: movie.url,
                 position: position,
                 duration: duration,
-                timeText: formatTime(position)
+                timeText: formatTime(position),
+                updatedAt: Date.now()
             });
 
             if (history.length > 15) history.pop();
@@ -348,23 +346,25 @@
             historyGrid.innerHTML = "";
 
             history.forEach(item => {
+                let finalThumb = item.thumb_url || 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
                 const progressPercent = (item.position / item.duration) * 100 || 0;
 
                 const card = document.createElement('div');
-                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group flex-shrink-0 w-32 md:w-40 snap-start border border-gray-700/50";
+                card.className = "bg-gray-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition duration-300 cursor-pointer group flex-shrink-0 w-36 md:w-44 snap-start";
                 card.onclick = () => watchMovie(item.slug, item.epName);
 
                 card.innerHTML = `
                     <div class="relative aspect-[3/4] bg-gray-700">
-                        <img src="${item.thumb_url}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy">
-                        <span class="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow">Tập ${item.epName}</span>
+                        <img src="${finalThumb}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null; this.src='https://placehold.co/300x400/1f2937/ffffff?text=No+Image'">
+                        <span class="absolute top-2 left-2 bg-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold shadow-md z-10">Tập ${item.epName}</span>
+                        
                         <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-600 z-10">
                             <div class="bg-red-500 h-full transition-all duration-300" style="width: ${progressPercent}%"></div>
                         </div>
                     </div>
                     <div class="p-2">
                         <h3 class="font-semibold text-xs line-clamp-1 group-hover:text-red-400 transition">${item.name}</h3>
-                        <p class="text-[10px] text-gray-400 mt-0.5">Dừng: ${item.timeText || '00:00'}</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Dừng ở: ${item.timeText || '00:00'}</p>
                     </div>
                 `;
                 historyGrid.appendChild(card);
@@ -372,7 +372,7 @@
         }
 
         function clearHistory() {
-            if (confirm("Xóa lịch sử đã xem?")) {
+            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử đã xem không?")) {
                 localStorage.removeItem('huy_cinema_history');
                 renderHistory();
             }
@@ -393,18 +393,20 @@
             if (hls) hls.destroy();
             document.getElementById('playerSection').classList.add('hidden');
             currentPlaying = null;
-            if (currentPage === 1 && currentCategory === 'all') renderHistory();
+            if (currentPage === 1) renderHistory();
         }
 
         function changePage(step) {
             let targetPage = currentPage + step;
-            if (targetPage < 1 || targetPage > 50) return; 
+            if (targetPage < 1 || targetPage > totalPages) return; 
             loadMovies(targetPage);
         }
 
+        // Cập nhật tiến trình thời gian xem video
         const videoEl = document.getElementById('videoPlayer');
         videoEl.addEventListener('timeupdate', () => {
             if (!currentPlaying || videoEl.duration === 0) return;
+            
             if (!saveTimeout) {
                 saveTimeout = setTimeout(() => {
                     saveHistoryItem(currentPlaying, videoEl.currentTime, videoEl.duration);
@@ -413,6 +415,13 @@
             }
         });
 
+        videoEl.addEventListener('pause', () => {
+            if (currentPlaying && videoEl.duration > 0) {
+                saveHistoryItem(currentPlaying, videoEl.currentTime, videoEl.duration);
+            }
+        });
+
+        // Khởi động trang web
         loadMovies(1);
     </script>
 </body>
