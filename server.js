@@ -8,13 +8,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-// Phục vụ file tĩnh từ thư mục public
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- HÀM BỔ TRỢ CHUẨN HÓA DỮ LIỆU ---
 
-// Nối domain ảnh nếu API trả về link tương đối
 function fixImageUrl(rawUrl, pathImage = "https://ophimimg.com/uploads/movies/") {
     if (!rawUrl) return 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
@@ -25,7 +22,6 @@ function fixImageUrl(rawUrl, pathImage = "https://ophimimg.com/uploads/movies/")
     return `${base}${cleanPath}`;
 }
 
-// Xử lý chuỗi hiển thị số tập
 function fixEpisodeStatus(current, total) {
     if (!current) return "Cập nhật";
     let cleanCurrent = String(current).trim();
@@ -42,22 +38,45 @@ function fixEpisodeStatus(current, total) {
 
 // --- API ROUTES ---
 
-// 1. Lấy danh sách phim theo trang (Đã sửa lỗi 50 trang, đứt ảnh & hiển thị tập)
+// Lấy danh sách phim (Hỗ trợ lọc theo danh mục: all, phim-bo, phim-le, hoat-hinh, tv-shows)
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
-        const response = await axios.get(`https://ophim1.com/danh-sach/phim-moi-cap-nhat?page=${page}`);
+        const category = req.query.category || 'all'; 
+
+        let url = '';
+        if (category === 'all') {
+            url = `https://ophim1.com/danh-sach/phim-moi-cap-nhat?page=${page}`;
+        } else {
+            url = `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
+        }
+
+        const response = await axios.get(url);
         const data = response.data;
 
-        const pathImage = data.pathImage || "https://ophimimg.com/uploads/movies/";
-        const pagination = data.pagination || {};
-        
-        // Tính tổng số trang chính xác dựa trên totalItems và totalItemsPerPage từ API
-        const totalItems = pagination.totalItems || 0;
-        const totalItemsPerPage = pagination.totalItemsPerPage || 10;
+        let rawItems = [];
+        let pathImage = "https://ophimimg.com/uploads/movies/";
+        let totalItems = 0;
+        let totalItemsPerPage = 10;
+
+        if (category === 'all') {
+            rawItems = data.items || [];
+            pathImage = data.pathImage || pathImage;
+            const pagination = data.pagination || {};
+            totalItems = pagination.totalItems || 0;
+            totalItemsPerPage = pagination.totalItemsPerPage || 10;
+        } else {
+            const resData = data.data || {};
+            rawItems = resData.items || [];
+            pathImage = resData.APP_DOMAIN_CDN_IMAGE || pathImage;
+            const pagination = resData.params?.pagination || {};
+            totalItems = pagination.totalItems || 0;
+            totalItemsPerPage = pagination.totalItemsPerPage || 10;
+        }
+
         const totalPages = totalItems ? Math.ceil(totalItems / totalItemsPerPage) : 1;
 
-        const items = (data.items || []).map(item => ({
+        const items = rawItems.map(item => ({
             slug: item.slug,
             name: item.name,
             origin_name: item.origin_name,
@@ -79,7 +98,7 @@ app.get('/api/movies', async (req, res) => {
     }
 });
 
-// 2. Chi tiết phim & danh sách Server
+// Chi tiết phim
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
@@ -92,7 +111,6 @@ app.get('/api/movie/:slug', async (req, res) => {
 
         const movie = data.movie;
         const pathImage = data.pathImage || "https://ophimimg.com/uploads/movies/";
-
         movie.thumb_url = fixImageUrl(movie.thumb_url || movie.poster_url, pathImage);
 
         res.json({
@@ -106,7 +124,7 @@ app.get('/api/movie/:slug', async (req, res) => {
     }
 });
 
-// 3. Tìm kiếm phim
+// Tìm kiếm phim
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
@@ -134,7 +152,6 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// Mọi route khác đều chuyển về trang index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
