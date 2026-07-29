@@ -1,285 +1,144 @@
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 const path = require('path');
-const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cấu hình Middleware
 app.use(cors());
+app.use(express.json());
+
+// Phục vụ file tĩnh từ thư mục public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Địa chỉ 3 nguồn API phim gốc
-const SOURCES = {
-    OPHIM: "https://ophim1.com",
-    PHIMAPI: "https://phimapi.com",
-    NGUONC: "https://phim.nguonc.com/api"
-};
+// --- HÀM BỔ TRỢ CHUẨN HÓA DỮ LIỆU ---
 
-// ==========================================
-// 1. API LẤY DANH SÁCH PHIM (ƯU TIÊN ẢNH OPHIM)
-// ==========================================
-app.get('/api/movies', async (req, res) => {
-    const page = req.query.page || 1;
-    const category = req.query.category || 'all';
-
-    try {
-        let ophimUrl = `${SOURCES.OPHIM}/danh-sach/phim-moi-cap-nhat?page=${page}`;
-        let phimapiUrl = `${SOURCES.PHIMAPI}/danh-sach/phim-moi-cap-nhat?page=${page}`;
-        let nguoncUrl = `${SOURCES.NGUONC}/films/phim-moi-cap-nhat?page=${page}`;
-
-        if (category === 'hoat-hinh') {
-            ophimUrl = `${SOURCES.OPHIM}/v1/api/danh-sach/hoat-hinh?page=${page}`;
-            phimapiUrl = `${SOURCES.PHIMAPI}/v1/api/danh-sach/hoat-hinh?page=${page}`;
-            nguoncUrl = `${SOURCES.NGUONC}/films/the-loai/hoat-hinh?page=${page}`;
-        } else if (category === 'phim-bo') {
-            ophimUrl = `${SOURCES.OPHIM}/v1/api/danh-sach/phim-bo?page=${page}`;
-            phimapiUrl = `${SOURCES.PHIMAPI}/v1/api/danh-sach/phim-bo?page=${page}`;
-            nguoncUrl = `${SOURCES.NGUONC}/films/danh-sach/phim-bo?page=${page}`;
-        } else if (category === 'phim-le') {
-            ophimUrl = `${SOURCES.OPHIM}/v1/api/danh-sach/phim-le?page=${page}`;
-            phimapiUrl = `${SOURCES.PHIMAPI}/v1/api/danh-sach/phim-le?page=${page}`;
-            nguoncUrl = `${SOURCES.NGUONC}/films/danh-sach/phim-le?page=${page}`;
-        }
-
-        const [ophimRes, phimapiRes, nguoncRes] = await Promise.allSettled([
-            fetch(ophimUrl).then(r => r.json()),
-            fetch(phimapiUrl).then(r => r.json()),
-            fetch(nguoncUrl).then(r => r.json())
-        ]);
-
-        let rawList = [];
-
-        if (ophimRes.status === 'fulfilled' && ophimRes.value) {
-            const items = ophimRes.value.items || ophimRes.value.data?.items || [];
-            const baseImg = ophimRes.value.pathImage || 'https://ophimimg.com/uploads/movies/';
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'Ophim', baseImg)));
-        }
-
-        if (phimapiRes.status === 'fulfilled' && phimapiRes.value) {
-            const items = phimapiRes.value.items || phimapiRes.value.data?.items || [];
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'PhimAPI', 'https://phimimg.com/upload/vod/')));
-        }
-
-        if (nguoncRes.status === 'fulfilled' && nguoncRes.value) {
-            const items = nguoncRes.value.items || [];
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'NguonC', '')));
-        }
-
-        // Lọc trùng & Ưu tiên lấy dữ liệu / hình ảnh từ Ophim
-        const uniqueMoviesMap = new Map();
-        rawList.forEach(movie => {
-            const key = movie.slug || movie.name.toLowerCase().trim();
-            if (!uniqueMoviesMap.has(key)) {
-                uniqueMoviesMap.set(key, movie);
-            } else if (movie.source === 'Ophim') {
-                uniqueMoviesMap.set(key, movie); // Đè lên bằng bản từ Ophim
-            }
-        });
-
-        res.json({
-            status: true,
-            page: Number(page),
-            totalPages: 50,
-            items: Array.from(uniqueMoviesMap.values())
-        });
-
-    } catch (err) {
-        console.error("Lỗi Server:", err);
-        res.status(500).json({ status: false, message: "Lỗi kết nối Server API" });
+// Nối domain ảnh nếu API trả về link tương đối
+function fixImageUrl(rawUrl, pathImage = "https://ophimimg.com/uploads/movies/") {
+    if (!rawUrl) return 'https://placehold.co/300x400/1f2937/ffffff?text=No+Image';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+        return rawUrl;
     }
-});
-
-// ==========================================
-// 2. API LẤY CHI TIẾT PHIM & TẬP
-// ==========================================
-app.get('/api/movie/:slug', async (req, res) => {
-    const slug = req.params.slug;
-
-    try {
-        const [ophimRes, phimapiRes, nguoncRes] = await Promise.allSettled([
-            fetch(`${SOURCES.OPHIM}/phim/${slug}`).then(r => r.json()),
-            fetch(`${SOURCES.PHIMAPI}/phim/${slug}`).then(r => r.json()),
-            fetch(`${SOURCES.NGUONC}/film/${slug}`).then(r => r.json())
-        ]);
-
-        let movieDetail = null;
-        let servers = [];
-
-        // Ưu tiên thông tin & hình ảnh từ Ophim
-        if (ophimRes.status === 'fulfilled' && ophimRes.value?.status) {
-            movieDetail = ophimRes.value.movie;
-            const baseImg = ophimRes.value.pathImage || 'https://ophimimg.com/uploads/movies/';
-            if (movieDetail.thumb_url && !movieDetail.thumb_url.startsWith('http')) {
-                movieDetail.thumb_url = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${movieDetail.thumb_url.replace(/^\/+/, '')}`;
-            }
-            if (movieDetail.poster_url && !movieDetail.poster_url.startsWith('http')) {
-                movieDetail.poster_url = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${movieDetail.poster_url.replace(/^\/+/, '')}`;
-            }
-
-            const eps = ophimRes.value.episodes?.[0]?.server_data || [];
-            if (eps.length > 0) {
-                servers.push({
-                    server_name: "Ophim",
-                    server_data: eps.map(e => ({ name: e.name, link_m3u8: e.link_m3u8 }))
-                });
-            }
-        }
-
-        // PhimAPI
-        if (phimapiRes.status === 'fulfilled' && phimapiRes.value?.status) {
-            if (!movieDetail) movieDetail = phimapiRes.value.movie;
-            const eps = phimapiRes.value.episodes?.[0]?.server_data || [];
-            if (eps.length > 0) {
-                servers.push({
-                    server_name: "PhimAPI",
-                    server_data: eps.map(e => ({ name: e.name, link_m3u8: e.link_m3u8 }))
-                });
-            }
-        }
-
-        // NguonC
-        if (nguoncRes.status === 'fulfilled' && nguoncRes.value?.status === 'success') {
-            const film = nguoncRes.value.movie;
-            if (!movieDetail) {
-                movieDetail = {
-                    name: film.name,
-                    origin_name: film.original_name,
-                    slug: film.slug,
-                    thumb_url: film.thumb_url,
-                    poster_url: film.poster_url,
-                    year: film.category?.['3']?.list?.[0]?.name || ''
-                };
-            }
-            const items = nguoncRes.value.episodes?.[0]?.items || [];
-            if (items.length > 0) {
-                servers.push({
-                    server_name: "NguonC",
-                    server_data: items.map(e => ({ name: e.name, link_m3u8: e.m3u8 || e.embed }))
-                });
-            }
-        }
-
-        if (!movieDetail) {
-            return res.status(404).json({ status: false, message: "Không tìm thấy phim!" });
-        }
-
-        res.json({
-            status: true,
-            movie: movieDetail,
-            servers: servers
-        });
-
-    } catch (err) {
-        console.error("Lỗi lấy chi tiết:", err);
-        res.status(500).json({ status: false, message: "Lỗi Server" });
-    }
-});
-
-// ==========================================
-// 3. API TÌM KIẾM PHIM
-// ==========================================
-app.get('/api/search', async (req, res) => {
-    const keyword = req.query.keyword;
-    if (!keyword) return res.json({ status: true, items: [] });
-
-    try {
-        const [ophimRes, phimapiRes] = await Promise.allSettled([
-            fetch(`${SOURCES.OPHIM}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json()),
-            fetch(`${SOURCES.PHIMAPI}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`).then(r => r.json())
-        ]);
-
-        let rawList = [];
-
-        if (ophimRes.status === 'fulfilled' && ophimRes.value) {
-            const items = ophimRes.value.data?.items || ophimRes.value.items || [];
-            const baseImg = ophimRes.value.data?.pathImage || 'https://ophimimg.com/uploads/movies/';
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'Ophim', baseImg)));
-        }
-
-        if (phimapiRes.status === 'fulfilled' && phimapiRes.value) {
-            const items = phimapiRes.value.data?.items || phimapiRes.value.items || [];
-            items.forEach(item => rawList.push(normalizeMovieItem(item, 'PhimAPI', 'https://phimimg.com/upload/vod/')));
-        }
-
-        const uniqueMoviesMap = new Map();
-        rawList.forEach(movie => {
-            const key = movie.slug || movie.name.toLowerCase().trim();
-            if (!uniqueMoviesMap.has(key)) {
-                uniqueMoviesMap.set(key, movie);
-            } else if (movie.source === 'Ophim') {
-                uniqueMoviesMap.set(key, movie);
-            }
-        });
-
-        res.json({
-            status: true,
-            items: Array.from(uniqueMoviesMap.values())
-        });
-    } catch (err) {
-        console.error("Lỗi tìm kiếm:", err);
-        res.status(500).json({ status: false, message: "Lỗi Server Tìm kiếm" });
-    }
-});
-
-// ==========================================
-// HÀM CHUẨN HÓA DỮ LIỆU & TRẠNG THÁI TẬP
-// ==========================================
-function normalizeMovieItem(item, sourceName, baseImg) {
-    let thumb = item.thumb_url || item.poster_url || "";
-    if (thumb && !thumb.startsWith('http')) {
-        let clean = thumb.replace(/^\/+/, '');
-        thumb = `${baseImg.endsWith('/') ? baseImg : baseImg + '/'}${clean}`;
-    }
-
-    // Xử lý logic hiển thị số tập
-    let current = item.episode_current || '';
-    let total = item.episode_total || item.total_episodes || '';
-    let status = (item.status || '').toLowerCase();
-
-    let cleanTotal = total.toString().replace(/[^0-9]/g, '');
-    let displayEpisode = '';
-
-    const isCompleted = status === 'completed' || 
-                        current.toLowerCase().includes('full') || 
-                        current.toLowerCase().includes('hoàn tất') ||
-                        (cleanTotal && current.includes(cleanTotal));
-
-    if (isCompleted) {
-        displayEpisode = cleanTotal ? `Hoàn tất (${cleanTotal} tập)` : (current || 'Hoàn tất');
-    } else {
-        if (current) {
-            if (cleanTotal && !current.includes('/')) {
-                displayEpisode = `${current}/${cleanTotal} tập`;
-            } else {
-                displayEpisode = current;
-            }
-        } else {
-            displayEpisode = 'Đang cập nhật';
-        }
-    }
-
-    return {
-        name: item.name,
-        origin_name: item.origin_name || item.original_name || '',
-        slug: item.slug,
-        thumb_url: thumb,
-        year: item.year || '',
-        episode_current: displayEpisode,
-        lang: item.lang || 'Vietsub',
-        source: sourceName
-    };
+    const cleanPath = rawUrl.replace(/^\/+/, '');
+    const base = pathImage.endsWith('/') ? pathImage : `${pathImage}/`;
+    return `${base}${cleanPath}`;
 }
 
-// ==========================================
-// ROUTE TRẢ VỀ TRANG CHỦ
-// ==========================================
+// Xử lý chuỗi hiển thị số tập
+function fixEpisodeStatus(current, total) {
+    if (!current) return "Cập nhật";
+    let cleanCurrent = String(current).trim();
+    let cleanTotal = String(total || '').toLowerCase().replace(/tập/g, '').trim();
+
+    if (cleanCurrent.toLowerCase().includes("hoàn") || cleanCurrent.toLowerCase().includes("full")) {
+        return "Hoàn Tất";
+    }
+    if (!cleanCurrent.includes("/") && cleanTotal && cleanTotal !== "??") {
+        return `${cleanCurrent}/${cleanTotal}`;
+    }
+    return cleanCurrent;
+}
+
+// --- API ROUTES ---
+
+// 1. Lấy danh sách phim theo trang (Đã sửa lỗi 50 trang, đứt ảnh & hiển thị tập)
+app.get('/api/movies', async (req, res) => {
+    try {
+        const page = req.query.page || 1;
+        const response = await axios.get(`https://ophim1.com/danh-sach/phim-moi-cap-nhat?page=${page}`);
+        const data = response.data;
+
+        const pathImage = data.pathImage || "https://ophimimg.com/uploads/movies/";
+        const pagination = data.pagination || {};
+        
+        // Tính tổng số trang chính xác dựa trên totalItems và totalItemsPerPage từ API
+        const totalItems = pagination.totalItems || 0;
+        const totalItemsPerPage = pagination.totalItemsPerPage || 10;
+        const totalPages = totalItems ? Math.ceil(totalItems / totalItemsPerPage) : 1;
+
+        const items = (data.items || []).map(item => ({
+            slug: item.slug,
+            name: item.name,
+            origin_name: item.origin_name,
+            year: item.year,
+            lang: item.lang || 'Vietsub',
+            thumb_url: fixImageUrl(item.thumb_url || item.poster_url, pathImage),
+            episode_current: fixEpisodeStatus(item.episode_current, item.episode_total)
+        }));
+
+        res.json({
+            status: true,
+            currentPage: Number(page),
+            totalPages: totalPages,
+            items: items
+        });
+    } catch (error) {
+        console.error("Lỗi /api/movies:", error.message);
+        res.status(500).json({ status: false, message: "Lỗi khi kết nối nguồn phim" });
+    }
+});
+
+// 2. Chi tiết phim & danh sách Server
+app.get('/api/movie/:slug', async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const response = await axios.get(`https://ophim1.com/phim/${slug}`);
+        const data = response.data;
+
+        if (!data.status || !data.movie) {
+            return res.status(404).json({ status: false, message: "Không tìm thấy phim" });
+        }
+
+        const movie = data.movie;
+        const pathImage = data.pathImage || "https://ophimimg.com/uploads/movies/";
+
+        movie.thumb_url = fixImageUrl(movie.thumb_url || movie.poster_url, pathImage);
+
+        res.json({
+            status: true,
+            movie: movie,
+            servers: data.episodes || []
+        });
+    } catch (error) {
+        console.error("Lỗi /api/movie/:slug:", error.message);
+        res.status(500).json({ status: false, message: "Lỗi khi tải chi tiết phim" });
+    }
+});
+
+// 3. Tìm kiếm phim
+app.get('/api/search', async (req, res) => {
+    try {
+        const keyword = req.query.keyword || '';
+        const response = await axios.get(`https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}`);
+        const result = response.data?.data || response.data;
+
+        const pathImage = result.pathImage || "https://ophimimg.com/uploads/movies/";
+        const items = (result.items || []).map(item => ({
+            slug: item.slug,
+            name: item.name,
+            origin_name: item.origin_name,
+            year: item.year,
+            lang: item.lang || 'Vietsub',
+            thumb_url: fixImageUrl(item.thumb_url || item.poster_url, pathImage),
+            episode_current: fixEpisodeStatus(item.episode_current, item.episode_total)
+        }));
+
+        res.json({
+            status: true,
+            items: items
+        });
+    } catch (error) {
+        console.error("Lỗi /api/search:", error.message);
+        res.status(500).json({ status: false, message: "Lỗi khi tìm kiếm phim" });
+    }
+});
+
+// Mọi route khác đều chuyển về trang index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Khởi chạy Server
 app.listen(PORT, () => {
-    console.log(`Server Huy Cinema đang chạy tại port ${PORT}`);
+    console.log(`Server đang chạy tại: http://localhost:${PORT}`);
 });
