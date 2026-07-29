@@ -16,7 +16,7 @@ function normalizeEpisode(epText) {
     return `Tập ${clean}`;
 }
 
-// Hàm chuẩn hóa URL hình ảnh (Ophim vs PhimAPI)
+// Hàm chuẩn hóa URL hình ảnh theo nguồn
 function normalizeImageUrl(url, source = 'ophim') {
     if (!url) return 'https://placehold.co/300x400/121218/ffffff?text=No+Image';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
@@ -27,32 +27,71 @@ function normalizeImageUrl(url, source = 'ophim') {
     return `https://img.ophim.live/uploads/movies/${url}`;
 }
 
-// API: Lấy danh sách phim (Trang chủ & Danh mục)
+// API: Lấy danh sách phim (Trang chủ & Danh mục - Kết hợp PhimAPI + Ophim)
 app.get('/api/movies', async (req, res) => {
     try {
         const page = req.query.page || 1;
         const category = req.query.category || 'all';
         
-        let url = `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
-        if (category === 'all') {
-            url = `https://ophim1.com/v1/api/home?page=${page}`;
+        const ophimUrl = category === 'all' 
+            ? `https://ophim1.com/v1/api/home?page=${page}`
+            : `https://ophim1.com/v1/api/danh-sach/${category}?page=${page}`;
+
+        const phimapiUrl = category === 'all'
+            ? `https://phimapi.com/v1/api/home?page=${page}`
+            : `https://phimapi.com/v1/api/danh-sach/${category}?page=${page}`;
+
+        const [ophimRes, phimapiRes] = await Promise.allSettled([
+            axios.get(ophimUrl),
+            axios.get(phimapiUrl)
+        ]);
+
+        const movieMap = new Map();
+        let totalPages = 1;
+
+        // 1. Lấy từ PhimAPI trước (để có phim mới cập nhật nhanh)
+        if (phimapiRes.status === 'fulfilled') {
+            const data = phimapiRes.value.data;
+            const items = data.items || data.data?.items || [];
+            totalPages = data.params?.pagination?.totalPages || data.data?.params?.pagination?.totalPages || 1;
+            
+            items.forEach(item => {
+                const slug = item.slug;
+                if (slug) {
+                    movieMap.set(slug, {
+                        ...item,
+                        thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'phimapi'),
+                        poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'phimapi'),
+                        episode_current: normalizeEpisode(item.episode_current)
+                    });
+                }
+            });
         }
 
-        const response = await axios.get(url);
-        const data = response.data;
+        // 2. Lấy từ Ophim sau và ghi đè (Ưu tiên ảnh đẹp và thông tin chuẩn của Ophim cho các phim chung)
+        if (ophimRes.status === 'fulfilled') {
+            const data = ophimRes.value.data;
+            const items = data.data?.items || [];
+            const ophimTotalPages = data.data?.params?.pagination?.totalPages;
+            if (ophimTotalPages) totalPages = ophimTotalPages;
 
-        let items = data.data?.items || [];
-        items = items.map(item => ({
-            ...item,
-            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
-            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
-            episode_current: normalizeEpisode(item.episode_current)
-        }));
+            items.forEach(item => {
+                const slug = item.slug;
+                if (slug) {
+                    movieMap.set(slug, {
+                        ...item,
+                        thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
+                        poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
+                        episode_current: normalizeEpisode(item.episode_current)
+                    });
+                }
+            });
+        }
 
         res.json({
             status: true,
-            items: items,
-            totalPages: data.data?.params?.pagination?.totalPages || 1
+            items: Array.from(movieMap.values()),
+            totalPages: totalPages
         });
     } catch (error) {
         console.error("Lỗi lấy danh sách phim:", error.message);
@@ -60,46 +99,64 @@ app.get('/api/movies', async (req, res) => {
     }
 });
 
-// API: Tìm kiếm (Ưu tiên Ophim trước, nếu không có mới dùng PhimAPI)
+// API: Tìm kiếm (Kết hợp cả 2 nguồn, ưu tiên hiển thị ảnh Ophim khi trùng)
 app.get('/api/search', async (req, res) => {
     try {
         const keyword = req.query.keyword || '';
-        
-        // 1. Thử tìm bên Ophim trước
-        const ophimUrl = `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
-        const ophimRes = await axios.get(ophimUrl);
-        let items = ophimRes.data.data?.items || [];
+        const searchUrl = encodeURIComponent(keyword);
 
-        if (items.length > 0) {
-            items = items.map(item => ({
-                ...item,
-                thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
-                poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
-                episode_current: normalizeEpisode(item.episode_current)
-            }));
-            return res.json({ status: true, items: items });
+        const [ophimRes, phimapiRes] = await Promise.allSettled([
+            axios.get(`https://ophim1.com/v1/api/tim-kiem?keyword=${searchUrl}&limit=20`),
+            axios.get(`https://phimapi.com/v1/api/tim-kiem?keyword=${searchUrl}&limit=20`)
+        ]);
+
+        const movieMap = new Map();
+
+        // 1. Tìm từ PhimAPI trước
+        if (phimapiRes.status === 'fulfilled') {
+            const data = phimapiRes.value.data;
+            const items = data.items || data.data?.items || [];
+            items.forEach(item => {
+                const slug = item.slug;
+                if (slug) {
+                    movieMap.set(slug, {
+                        ...item,
+                        thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'phimapi'),
+                        poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'phimapi'),
+                        episode_current: normalizeEpisode(item.episode_current)
+                    });
+                }
+            });
         }
 
-        // 2. Nếu Ophim không có, tìm sang PhimAPI
-        const phimapiUrl = `https://phimapi.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&limit=20`;
-        const phimapiRes = await axios.get(phimapiUrl);
-        items = phimapiRes.data.items || phimapiRes.data.data?.items || [];
+        // 2. Tìm từ Ophim sau và ghi đè để ưu tiên ảnh đẹp của Ophim
+        if (ophimRes.status === 'fulfilled') {
+            const data = ophimRes.value.data;
+            const items = data.data?.items || [];
+            items.forEach(item => {
+                const slug = item.slug;
+                if (slug) {
+                    movieMap.set(slug, {
+                        ...item,
+                        thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'ophim'),
+                        poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'ophim'),
+                        episode_current: normalizeEpisode(item.episode_current)
+                    });
+                }
+            });
+        }
 
-        items = items.map(item => ({
-            ...item,
-            thumb_url: normalizeImageUrl(item.thumb_url || item.poster_url, 'phimapi'),
-            poster_url: normalizeImageUrl(item.poster_url || item.thumb_url, 'phimapi'),
-            episode_current: normalizeEpisode(item.episode_current)
-        }));
-
-        res.json({ status: true, items: items });
+        res.json({
+            status: true,
+            items: Array.from(movieMap.values())
+        });
     } catch (error) {
         console.error("Lỗi tìm kiếm phim:", error.message);
         res.status(500).json({ status: false, message: "Lỗi tìm kiếm" });
     }
 });
 
-// API: Chi tiết phim (Ưu tiên thông tin/ảnh Ophim + Gộp chung Server từ cả 2 nguồn)
+// API: Chi tiết phim (Ưu tiên ảnh/thông tin Ophim + Gộp chung Server từ cả 2 nguồn)
 app.get('/api/movie/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
@@ -113,7 +170,7 @@ app.get('/api/movie/:slug', async (req, res) => {
         let combinedServers = [];
         let hasOphim = false;
 
-        // 1. Xử lý dữ liệu từ Ophim
+        // 1. Lấy dữ liệu từ Ophim
         if (ophimRes.status === 'fulfilled' && ophimRes.value.data.status) {
             const ophimData = ophimRes.value.data;
             movie = ophimData.data.item;
@@ -131,7 +188,7 @@ app.get('/api/movie/:slug', async (req, res) => {
             });
         }
 
-        // 2. Xử lý dữ liệu từ PhimAPI (Gộp server và làm fallback nếu Ophim thiếu)
+        // 2. Lấy dữ liệu từ PhimAPI (Gộp server và làm fallback nếu Ophim chưa có phim)
         if (phimapiRes.status === 'fulfilled' && (phimapiRes.value.data.status || phimapiRes.value.data.movie)) {
             const phimapiData = phimapiRes.value.data;
             
